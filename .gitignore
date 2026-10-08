@@ -1,0 +1,7 @@
+bin/
+obj/
+release/
+publish/
+.vs/
+*.user
+*.zip

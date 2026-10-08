@@ -1,0 +1,420 @@
+<Window x:Class="IndexExplorer.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:IndexExplorer.ViewModels"
+        Title="색인 탐색기" Width="1180" Height="740" MinWidth="760" MinHeight="460"
+        FontFamily="{StaticResource AppFont}" FontSize="13" Foreground="{StaticResource InkBrush}"
+        Background="{StaticResource CanvasBrush}" UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display"
+        PreviewKeyDown="Window_PreviewKeyDown" PreviewMouseUp="Window_PreviewMouseUp">
+
+    <Window.Resources>
+        <Style TargetType="TreeViewItem" BasedOn="{StaticResource NavItem}" />
+
+        <!-- 트리 한 줄: 아이콘 + 이름(또는 이름 바꾸기 칸) + 핀/숫자 -->
+        <HierarchicalDataTemplate DataType="{x:Type vm:TreeNode}" ItemsSource="{Binding Children}">
+            <DockPanel LastChildFill="True">
+                <TextBlock DockPanel.Dock="Right" Text="{Binding Badge}" FontSize="11.5" Foreground="{StaticResource AccentBrush}"
+                           Margin="6,0,0,0" VerticalAlignment="Center" Visibility="{Binding Badge, Converter={StaticResource EmptyToCollapsed}}" />
+                <TextBlock DockPanel.Dock="Right" Text="&#xE718;" Style="{StaticResource Glyph}" FontSize="10" Foreground="{StaticResource MutedBrush}"
+                           Margin="6,0,0,0" ToolTip="저장 위치가 지정된 폴더" Visibility="{Binding IsPinned, Converter={StaticResource BoolToVis}}" />
+                <Image DockPanel.Dock="Left" Source="{Binding Icon}" Width="16" Height="16" Margin="0,0,7,0" VerticalAlignment="Center"
+                       RenderOptions.BitmapScalingMode="HighQuality" />
+                <Grid VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"
+                               Visibility="{Binding IsEditing, Converter={StaticResource NotBoolToVis}}" />
+                    <TextBox Style="{StaticResource RenameBox}" Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}"
+                             Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}"
+                             IsVisibleChanged="RenameBox_IsVisibleChanged" PreviewKeyDown="RenameBox_KeyDown" LostKeyboardFocus="RenameBox_LostFocus" />
+                </Grid>
+            </DockPanel>
+        </HierarchicalDataTemplate>
+
+        <!-- 자세히 보기: 이름 칸 -->
+        <DataTemplate x:Key="NameCell" DataType="{x:Type vm:ListItem}">
+            <DockPanel Margin="4,0,0,0">
+                <Image DockPanel.Dock="Left" Source="{Binding Icon}" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"
+                       RenderOptions.BitmapScalingMode="HighQuality" />
+                <Border DockPanel.Dock="Right" Background="{StaticResource WarningBgBrush}" CornerRadius="4" Padding="5,0" Margin="6,0,0,0"
+                        VerticalAlignment="Center" Visibility="{Binding Missing, Converter={StaticResource BoolToVis}}"
+                        ToolTip="원본 파일을 찾을 수 없습니다. 삭제되었거나 다른 드라이브로 옮겨졌을 수 있습니다.">
+                    <TextBlock Text="원본 없음" FontSize="11" Foreground="{StaticResource WarningBrush}" />
+                </Border>
+                <Grid VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"
+                               Visibility="{Binding IsEditing, Converter={StaticResource NotBoolToVis}}" />
+                    <TextBox Style="{StaticResource RenameBox}" Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}" Margin="-4,0,0,0"
+                             Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}"
+                             IsVisibleChanged="RenameBox_IsVisibleChanged" PreviewKeyDown="RenameBox_KeyDown" LostKeyboardFocus="RenameBox_LostFocus" />
+                </Grid>
+            </DockPanel>
+        </DataTemplate>
+
+        <Style x:Key="CellText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource SecondaryBrush}" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="4,0,0,0" />
+        </Style>
+
+        <!-- 자세히 보기 한 줄 -->
+        <Style x:Key="RowItem" TargetType="ListViewItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+            <EventSetter Event="MouseDoubleClick" Handler="Item_DoubleClick" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListViewItem">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="5" Margin="6,0,6,1" Height="28">
+                            <GridViewRowPresenter Columns="{TemplateBinding GridView.ColumnCollection}" VerticalAlignment="Center" Margin="-6,0,0,0" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource HoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource SelectBrush}" />
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsSelected" Value="True" />
+                                    <Condition Property="Selector.IsSelectionActive" Value="False" />
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource SelectInactiveBrush}" />
+                            </MultiTrigger>
+                            <DataTrigger Binding="{Binding IsDropTarget}" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource DropBrush}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsCut}" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.5" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Missing}" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 큰 아이콘 보기 한 칸 -->
+        <DataTemplate x:Key="TileTemplate" DataType="{x:Type vm:ListItem}">
+            <StackPanel>
+                <Grid Height="68">
+                    <Image Source="{Binding DisplayImage}" MaxWidth="68" MaxHeight="64" Stretch="Uniform"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality" />
+                </Grid>
+                <Grid Margin="0,4,0,0">
+                    <TextBlock Text="{Binding Name}" TextWrapping="Wrap" TextAlignment="Center" TextTrimming="CharacterEllipsis"
+                               MaxHeight="34" FontSize="12" Visibility="{Binding IsEditing, Converter={StaticResource NotBoolToVis}}" />
+                    <TextBox Style="{StaticResource RenameBox}" Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}" FontSize="12"
+                             TextWrapping="Wrap" Visibility="{Binding IsEditing, Converter={StaticResource BoolToVis}}"
+                             IsVisibleChanged="RenameBox_IsVisibleChanged" PreviewKeyDown="RenameBox_KeyDown" LostKeyboardFocus="RenameBox_LostFocus" />
+                </Grid>
+            </StackPanel>
+        </DataTemplate>
+
+        <Style x:Key="TileItem" TargetType="ListViewItem">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+            <EventSetter Event="MouseDoubleClick" Handler="Item_DoubleClick" />
+            <EventSetter Event="Loaded" Handler="Tile_Loaded" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListViewItem">
+                        <Border x:Name="Bd" Width="108" Height="124" CornerRadius="8" Margin="3" Padding="6,8,6,4" Background="Transparent">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource HoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource SelectBrush}" />
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsSelected" Value="True" />
+                                    <Condition Property="Selector.IsSelectionActive" Value="False" />
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource SelectInactiveBrush}" />
+                            </MultiTrigger>
+                            <DataTrigger Binding="{Binding IsDropTarget}" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource DropBrush}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsCut}" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.5" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <ItemsPanelTemplate x:Key="RowsPanel"><VirtualizingStackPanel /></ItemsPanelTemplate>
+        <ItemsPanelTemplate x:Key="TilesPanel"><WrapPanel Margin="8,6" /></ItemsPanelTemplate>
+
+        <!-- 주소 표시줄 한 칸 -->
+        <DataTemplate DataType="{x:Type vm:CrumbSegment}">
+            <StackPanel Orientation="Horizontal">
+                <Path x:Name="Sep" Data="M0,0 L3.5,3.5 L0,7" Stroke="{StaticResource MutedBrush}" StrokeThickness="1.2"
+                      VerticalAlignment="Center" Margin="3,0,3,0" />
+                <Button Style="{StaticResource ToolButtonB}" Height="26" Padding="6,0" Content="{Binding Text}"
+                        Click="Crumb_SegmentClick" Tag="{Binding}" />
+            </StackPanel>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsFirst}" Value="True">
+                    <Setter TargetName="Sep" Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <GridView x:Key="DetailsView" x:Shared="False" AllowsColumnReorder="True">
+            <GridViewColumn Header="이름" Width="290" CellTemplate="{StaticResource NameCell}" />
+            <GridViewColumn Header="수정한 날짜" Width="156">
+                <GridViewColumn.CellTemplate>
+                    <DataTemplate><TextBlock Text="{Binding ModifiedText}" Style="{StaticResource CellText}" /></DataTemplate>
+                </GridViewColumn.CellTemplate>
+            </GridViewColumn>
+            <GridViewColumn Header="유형" Width="130">
+                <GridViewColumn.CellTemplate>
+                    <DataTemplate><TextBlock Text="{Binding TypeName}" Style="{StaticResource CellText}" /></DataTemplate>
+                </GridViewColumn.CellTemplate>
+            </GridViewColumn>
+            <GridViewColumn Header="크기" Width="76">
+                <GridViewColumn.CellTemplate>
+                    <DataTemplate><TextBlock Text="{Binding SizeText}" Style="{StaticResource CellText}" HorizontalAlignment="Right" Margin="0,0,8,0" /></DataTemplate>
+                </GridViewColumn.CellTemplate>
+            </GridViewColumn>
+            <GridViewColumn Header="원본 위치" Width="230">
+                <GridViewColumn.CellTemplate>
+                    <DataTemplate><TextBlock Text="{Binding Location}" Style="{StaticResource CellText}" ToolTip="{Binding Location}" /></DataTemplate>
+                </GridViewColumn.CellTemplate>
+            </GridViewColumn>
+            <GridViewColumn Header="색인" Width="150">
+                <GridViewColumn.CellTemplate>
+                    <DataTemplate><TextBlock Text="{Binding IndexText}" Style="{StaticResource CellText}" Foreground="#5A52B8" /></DataTemplate>
+                </GridViewColumn.CellTemplate>
+            </GridViewColumn>
+        </GridView>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="SidebarCol" Width="250" MinWidth="170" MaxWidth="480" />
+            <ColumnDefinition Width="*" MinWidth="300" />
+            <ColumnDefinition x:Name="PreviewCol" Width="290" MinWidth="0" MaxWidth="520" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ===== 1행: 이동 버튼 · 주소 · 검색 ===== -->
+        <Border Grid.Row="0" Grid.ColumnSpan="3" Padding="10,8,12,6">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                    <Button x:Name="BackBtn" Style="{StaticResource ToolButtonB}" Click="Back_Click" ToolTip="뒤로 (Alt+←)">
+                        <TextBlock Text="&#xE72B;" Style="{StaticResource Glyph}" FontSize="14" />
+                    </Button>
+                    <Button x:Name="FwdBtn" Style="{StaticResource ToolButtonB}" Click="Forward_Click" ToolTip="앞으로 (Alt+→)">
+                        <TextBlock Text="&#xE72A;" Style="{StaticResource Glyph}" FontSize="14" />
+                    </Button>
+                    <Button x:Name="UpBtn" Style="{StaticResource ToolButtonB}" Click="Up_Click" ToolTip="상위 폴더로 (Alt+↑)">
+                        <TextBlock Text="&#xE74A;" Style="{StaticResource Glyph}" FontSize="14" />
+                    </Button>
+                    <Button Style="{StaticResource ToolButtonB}" Click="Refresh_Click" ToolTip="새로 고침 (F5)">
+                        <TextBlock Text="&#xE72C;" Style="{StaticResource Glyph}" FontSize="13" />
+                    </Button>
+                </StackPanel>
+
+                <Border DockPanel.Dock="Right" Width="270" Height="32" CornerRadius="8" Background="{StaticResource FieldBrush}" Margin="8,0,0,0">
+                    <Grid Margin="10,0,4,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="&#xE721;" Style="{StaticResource Glyph}" FontSize="13" Foreground="{StaticResource MutedBrush}" />
+                        <TextBlock x:Name="SearchHint" Grid.Column="1" Text="모든 파일·색인 검색" Foreground="{StaticResource MutedBrush}"
+                                   Margin="8,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" />
+                        <TextBox x:Name="SearchBox" Grid.Column="1" Style="{StaticResource FieldBox}" Margin="6,0,0,0"
+                                 TextChanged="SearchBox_TextChanged" PreviewKeyDown="SearchBox_KeyDown" />
+                        <Button x:Name="SearchClear" Grid.Column="2" Style="{StaticResource ToolButtonB}" Height="24" MinWidth="24" Padding="4,0"
+                                Click="SearchClear_Click" Visibility="Collapsed" ToolTip="검색 지우기 (Esc)">
+                            <TextBlock Text="&#xE711;" Style="{StaticResource Glyph}" FontSize="10" Foreground="{StaticResource SecondaryBrush}" />
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <Border x:Name="CrumbBox" Height="32" CornerRadius="8" Background="{StaticResource FieldBrush}" Margin="8,0,0,0"
+                        MouseLeftButtonDown="CrumbBox_MouseDown" Cursor="IBeam">
+                    <Grid>
+                        <ScrollViewer x:Name="CrumbScroll" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
+                                      HorizontalAlignment="Left" Focusable="False">
+                            <ItemsControl x:Name="CrumbItems" Margin="4,0" VerticalAlignment="Center" Cursor="Arrow">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+                        </ScrollViewer>
+                        <TextBox x:Name="AddressBox" Style="{StaticResource FieldBox}" Margin="12,0" Visibility="Collapsed"
+                                 PreviewKeyDown="AddressBox_KeyDown" LostKeyboardFocus="AddressBox_LostFocus" />
+                    </Grid>
+                </Border>
+            </DockPanel>
+        </Border>
+
+        <!-- ===== 2행: 명령 막대 ===== -->
+        <Border Grid.Row="1" Grid.ColumnSpan="3" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1" Padding="10,0,12,6">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button x:Name="SortBtn" Style="{StaticResource ToolButtonB}" Click="SortMenu_Click" ToolTip="정렬 기준">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE8CB;" Style="{StaticResource Glyph}" FontSize="14" />
+                            <TextBlock Text="정렬" Margin="6,0,2,0" VerticalAlignment="Center" />
+                            <TextBlock Text="&#xE70D;" Style="{StaticResource Glyph}" FontSize="9" Foreground="{StaticResource SecondaryBrush}" />
+                        </StackPanel>
+                    </Button>
+                    <Rectangle Width="1" Height="18" Fill="{StaticResource HairlineBrush}" Margin="6,0" />
+                    <ToggleButton x:Name="DetailsBtn" Style="{StaticResource ToolToggle}" Click="DetailsView_Click" ToolTip="자세히 (Ctrl+Shift+6)">
+                        <TextBlock Text="&#xE8FD;" Style="{StaticResource Glyph}" FontSize="14" />
+                    </ToggleButton>
+                    <ToggleButton x:Name="TilesBtn" Style="{StaticResource ToolToggle}" Click="TilesView_Click" ToolTip="큰 아이콘 (Ctrl+Shift+2)">
+                        <TextBlock Text="&#xE8A9;" Style="{StaticResource Glyph}" FontSize="14" />
+                    </ToggleButton>
+                    <ToggleButton x:Name="PreviewBtn" Style="{StaticResource ToolToggle}" Click="PreviewToggle_Click" ToolTip="미리 보기 창 (Alt+P)">
+                        <TextBlock Text="&#xE7B3;" Style="{StaticResource Glyph}" FontSize="14" />
+                    </ToggleButton>
+                    <Rectangle Width="1" Height="18" Fill="{StaticResource HairlineBrush}" Margin="6,0" />
+                    <Button Style="{StaticResource ToolButtonB}" Click="Settings_Click" ToolTip="설정">
+                        <TextBlock Text="&#xE713;" Style="{StaticResource Glyph}" FontSize="14" />
+                    </Button>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Name="NewBtn" Style="{StaticResource ToolButtonB}" Click="NewMenu_Click" ToolTip="새 폴더·새 문서 만들기">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE710;" Style="{StaticResource Glyph}" FontSize="13" Foreground="{StaticResource AccentBrush}" />
+                            <TextBlock Text="새로 만들기" Margin="7,0,3,0" VerticalAlignment="Center" />
+                            <TextBlock Text="&#xE70D;" Style="{StaticResource Glyph}" FontSize="9" Foreground="{StaticResource SecondaryBrush}" />
+                        </StackPanel>
+                    </Button>
+                    <Rectangle Width="1" Height="18" Fill="{StaticResource HairlineBrush}" Margin="6,0" />
+                    <Button x:Name="CutBtn" Style="{StaticResource ToolButtonB}" Click="Cut_Click" ToolTip="잘라내기 (Ctrl+X)">
+                        <TextBlock Text="&#xE8C6;" Style="{StaticResource Glyph}" />
+                    </Button>
+                    <Button x:Name="CopyBtn" Style="{StaticResource ToolButtonB}" Click="Copy_Click" ToolTip="복사 (Ctrl+C)">
+                        <TextBlock Text="&#xE8C8;" Style="{StaticResource Glyph}" />
+                    </Button>
+                    <Button x:Name="PasteBtn" Style="{StaticResource ToolButtonB}" Click="Paste_Click" ToolTip="붙여넣기 (Ctrl+V)">
+                        <TextBlock Text="&#xE77F;" Style="{StaticResource Glyph}" />
+                    </Button>
+                    <Button x:Name="RenameBtn" Style="{StaticResource ToolButtonB}" Click="Rename_Click" ToolTip="이름 바꾸기 (F2)">
+                        <TextBlock Text="&#xE8AC;" Style="{StaticResource Glyph}" />
+                    </Button>
+                    <Button x:Name="DeleteBtn" Style="{StaticResource ToolButtonB}" Click="Delete_Click" ToolTip="삭제 (Delete)">
+                        <TextBlock Text="&#xE74D;" Style="{StaticResource Glyph}" />
+                    </Button>
+                    <Rectangle Width="1" Height="18" Fill="{StaticResource HairlineBrush}" Margin="6,0" />
+                    <Button x:Name="AddIndexBtn" Style="{StaticResource ToolButtonB}" Click="AddToIndexMenu_Click" ToolTip="선택한 파일을 색인 폴더에 연결 (파일은 옮기지 않음)">
+                        <StackPanel Orientation="Horizontal">
+                            <Image Source="{StaticResource IconIndexRoot}" Width="14" Height="14" />
+                            <TextBlock Text="색인에 추가" Margin="7,0,3,0" VerticalAlignment="Center" />
+                            <TextBlock Text="&#xE70D;" Style="{StaticResource Glyph}" FontSize="9" Foreground="{StaticResource SecondaryBrush}" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- ===== 3행 왼쪽: 사이드바 ===== -->
+        <Border Grid.Row="2" Grid.RowSpan="2" Grid.Column="0" Background="{StaticResource SidebarBrush}"
+                BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,1,0">
+            <DockPanel>
+                <Border DockPanel.Dock="Top" Margin="12,10,12,0" Background="#E6E6EA" CornerRadius="8" Padding="2">
+                    <UniformGrid Columns="2">
+                        <RadioButton x:Name="ModeIndex" Style="{StaticResource Segment}" GroupName="Mode" IsChecked="True" Checked="Mode_Checked"
+                                     ToolTip="내가 정한 분류로 보기 (Ctrl+1)">색인</RadioButton>
+                        <RadioButton x:Name="ModePhys" Style="{StaticResource Segment}" GroupName="Mode" Checked="Mode_Checked"
+                                     ToolTip="디스크의 실제 위치로 보기 (Ctrl+2)">원본</RadioButton>
+                    </UniformGrid>
+                </Border>
+                <TextBlock x:Name="ModeCaption" DockPanel.Dock="Top" Margin="16,6,12,6" FontSize="11.5" Foreground="{StaticResource MutedBrush}"
+                           Text="찾기 위한 목차 · 파일은 제자리에" />
+                <Grid>
+                    <TreeView x:Name="IndexTree" Background="Transparent" BorderThickness="0" Padding="6,0,8,8"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                              SelectedItemChanged="Tree_SelectedItemChanged" PreviewMouseRightButtonDown="Tree_PreviewRightDown"
+                              PreviewMouseLeftButtonDown="Tree_PreviewLeftDown" PreviewMouseMove="Tree_PreviewMouseMove" MouseMove="Tree_MouseMove" MouseLeave="Tree_MouseLeave"
+                              AllowDrop="True" DragOver="Tree_DragOver" Drop="Tree_Drop" DragLeave="Tree_DragLeave"
+                              ContextMenuOpening="Tree_ContextMenuOpening" />
+                    <TreeView x:Name="PhysTree" Background="Transparent" BorderThickness="0" Padding="6,0,8,8" Visibility="Collapsed"
+                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                              SelectedItemChanged="Tree_SelectedItemChanged" PreviewMouseRightButtonDown="Tree_PreviewRightDown"
+                              PreviewMouseLeftButtonDown="Tree_PreviewLeftDown" PreviewMouseMove="Tree_PreviewMouseMove" MouseMove="Tree_MouseMove" MouseLeave="Tree_MouseLeave"
+                              AllowDrop="True" DragOver="Tree_DragOver" Drop="Tree_Drop" DragLeave="Tree_DragLeave"
+                              ContextMenuOpening="Tree_ContextMenuOpening" />
+                </Grid>
+            </DockPanel>
+        </Border>
+        <GridSplitter Grid.Row="2" Grid.RowSpan="2" Grid.Column="0" Width="6" HorizontalAlignment="Right" Margin="0,0,-3,0"
+                      Background="Transparent" Panel.ZIndex="5" Focusable="False" />
+
+        <!-- ===== 3행 가운데: 파일 목록 ===== -->
+        <Grid Grid.Row="2" Grid.Column="1">
+            <ListView x:Name="List" BorderThickness="0" Background="Transparent" SelectionMode="Extended"
+                      VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                      SelectionChanged="List_SelectionChanged" PreviewMouseLeftButtonDown="List_PreviewLeftDown" PreviewMouseLeftButtonUp="List_PreviewLeftUp"
+                      PreviewMouseMove="List_PreviewMouseMove" PreviewMouseRightButtonUp="List_PreviewRightUp"
+                      AllowDrop="True" DragOver="List_DragOver" Drop="List_Drop" DragLeave="List_DragLeave"
+                      GridViewColumnHeader.Click="Header_Click" KeyDown="List_KeyDown" />
+            <StackPanel x:Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" Visibility="Collapsed">
+                <TextBlock x:Name="EmptyTitle" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" Foreground="{StaticResource SecondaryBrush}" />
+                <TextBlock x:Name="EmptyBody" FontSize="12.5" Margin="0,6,0,0" HorizontalAlignment="Center" TextAlignment="Center"
+                           Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" MaxWidth="440" LineHeight="19" />
+            </StackPanel>
+
+            <!-- 알림 (아래 가운데) -->
+            <Border x:Name="ToastBox" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,18" Padding="14,10"
+                    CornerRadius="10" Background="#F2242426" Visibility="Collapsed" MaxWidth="560">
+                <DockPanel>
+                    <Button x:Name="ToastAction" DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Foreground="#64B0FF"
+                            Margin="16,0,0,0" VerticalAlignment="Center" Click="ToastAction_Click" Visibility="Collapsed" />
+                    <StackPanel>
+                        <TextBlock x:Name="ToastTitle" Foreground="White" TextWrapping="Wrap" />
+                        <TextBlock x:Name="ToastBody" Foreground="#C7C7CC" FontSize="12" TextWrapping="Wrap" Margin="0,3,0,0" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+        </Grid>
+
+        <!-- ===== 3행 오른쪽: 미리 보기·정보 ===== -->
+        <GridSplitter x:Name="PreviewSplitter" Grid.Row="2" Grid.RowSpan="2" Grid.Column="2" Width="6" HorizontalAlignment="Left" Margin="-3,0,0,0"
+                      Background="Transparent" Panel.ZIndex="5" Focusable="False" />
+        <Border x:Name="PreviewPane" Grid.Row="2" Grid.RowSpan="2" Grid.Column="2" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1,0,0,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="18,16,18,18">
+                    <Border x:Name="PvThumbBox" Height="170" CornerRadius="10" Background="{StaticResource SidebarBrush}">
+                        <Image x:Name="PvImage" Stretch="Uniform" Margin="12" RenderOptions.BitmapScalingMode="HighQuality" />
+                    </Border>
+                    <TextBlock x:Name="PvTitle" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,14,0,2" />
+                    <TextBlock x:Name="PvSub" FontSize="12" Foreground="{StaticResource SecondaryBrush}" TextWrapping="Wrap" />
+                    <StackPanel x:Name="PvBody" Margin="0,8,0,0" />
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ===== 4행: 상태 표시줄 ===== -->
+        <Border Grid.Row="3" Grid.Column="1" Padding="14,5" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,1,0,0">
+            <DockPanel>
+                <TextBlock x:Name="StatusRight" DockPanel.Dock="Right" FontSize="11.5" Foreground="{StaticResource MutedBrush}" />
+                <TextBlock x:Name="StatusLeft" FontSize="11.5" Foreground="{StaticResource SecondaryBrush}" />
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

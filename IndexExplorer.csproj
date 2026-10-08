@@ -1,0 +1,43 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <!-- WPF Fluent 테마(ThemeMode)의 실험적 API 경고 억제 -->
+    <NoWarn>$(NoWarn);WPF0001;CA1416</NoWarn>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyTitle>색인 탐색기</AssemblyTitle>
+    <Product>색인 탐색기</Product>
+    <Description>파일 위치와 상관없이 나만의 분류(색인)로 정리하는 탐색기</Description>
+    <Copyright>© 2026</Copyright>
+    <Version>0.1.0</Version>
+    <!-- 성능: 미리 컴파일(ReadyToRun)로 시작 시간 단축 -->
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <TieredPGO>true</TieredPGO>
+    <ServerGarbageCollector>false</ServerGarbageCollector>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+    <!-- 알려진 취약점이 고쳐진 SQLite 네이티브 라이브러리로 고정 -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.13" />
+  </ItemGroup>
+
+  <!-- 포터블 릴리스 (dotnet publish -c Release -p:PortableRelease=true):
+       .NET이 없는 PC에서도 실행되는 단일 exe -->
+  <PropertyGroup Condition="'$(PortableRelease)' == 'true'">
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+    <DebugType>none</DebugType>
+    <SatelliteResourceLanguages>ko</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+</Project>
