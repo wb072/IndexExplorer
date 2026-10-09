@@ -30,11 +30,18 @@ public sealed class Indexer : IDisposable
     private volatile bool _fullRescan;
 
     public event Action<string>? Status;
+    public string LastStatus { get; private set; } = "";
     public bool IsScanning { get; private set; }
 
     public Indexer(IndexStore store, Settings settings, Dispatcher ui)
     {
         _store = store; _settings = settings; _ui = ui;
+    }
+
+    private void SetStatus(string s)
+    {
+        LastStatus = s;
+        Status?.Invoke(s);
     }
 
     public void Start()
@@ -123,7 +130,7 @@ public sealed class Indexer : IDisposable
         try
         {
             IsScanning = true;
-            if (full) _ui.Invoke(() => Status?.Invoke("색인 확인 중…"));
+            if (full) _ui.Invoke(() => SetStatus("색인 확인 중…"));
             var roots = _settings.EffectiveRoots();
 
             // 1) 현재 색인 상태 스냅숏 (UI 스레드)
@@ -187,7 +194,7 @@ public sealed class Indexer : IDisposable
                         foreach (var f in _store.Files.Where(f => f.Folders.Count == 0 && !roots.Any(r => PathUtil.IsUnder(f.Path, r))).ToList())
                             _store.Remove(f);
                 });
-                Status?.Invoke($"파일 {_store.FileCount:N0}개 색인됨");
+                SetStatus($"파일 {_store.FileCount:N0}개 색인됨");
             });
         }
         catch (Exception ex)

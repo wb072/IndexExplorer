@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -54,6 +55,10 @@ public partial class MainWindow
         enc.Save(fs);
     }
 
+    internal void TestPaste() => Paste(_loc);
+    internal List<string> TestItemNames() => _items.Select(i => i.Name).ToList();
+    internal void TestShot(string name) => Shot(name);
+
     private ListItem? ItemNamed(string name) => _items.FirstOrDefault(i => i.Name == name);
 
     private void SelectNamed(string name)
@@ -103,7 +108,7 @@ public partial class MainWindow
             SelectNamed("A프로젝트_견적서_v3.xlsx");
             await Settle(900);
             Check("색인 폴더 목록 (흩어진 원본 2개)", _items.Count == 2);
-            Check("트리 경로 강조 (A 프로젝트 가이드 선)", FindIndexNode(a.Id)?.IsOnPath == true && FindIndexNode(q.Id)?.IsSelected == true);
+            Check("트리에서 현재 폴더 선택·상위 펼침", FindIndexNode(a.Id)?.IsExpanded == true && FindIndexNode(q.Id)?.IsSelected == true);
             Shot("02_색인폴더_견적");
 
             // 4) 색인 폴더에서 새 문서 → 원본 보관함에 같은 구조로
@@ -243,6 +248,69 @@ public partial class MainWindow
             Navigate(new Location(LocKind.IndexFolder, q.Id));
             await Settle(600);
             Shot("08_최종_색인폴더");
+
+            // 19) 끌어서 여러 개 선택 — 자세히 보기, 화면 밖까지 (자동 스크롤 구간 포함)
+            Navigate(new Location(LocKind.Dir, Path: bulk));
+            await Settle(700);
+            if (FindListScroll() && RowGeometry() is { } geo)
+            {
+                var (h, o) = geo;
+                ArmMarqueeAt(new Point(330, o + 2.5 * h - _mSv!.VerticalOffset));
+                StartMarquee();
+                _mSv.ScrollToVerticalOffset(h * 45);
+                _mSv.UpdateLayout();
+                // 사용자가 61번째 줄(번호 60)을 가리킨 상황
+                var row60 = List.ItemContainerGenerator.ContainerFromIndex(60) as ListViewItem;
+                var y60 = row60?.TranslatePoint(new Point(0, row60.ActualHeight / 2), _mScp).Y ?? 0;
+                UpdateMarquee(new Point(520, y60));
+                await Settle(300);
+                Shot("09_범위선택_자세히");
+                var cnt = List.SelectedItems.Count;
+                var firstSel = List.Items.IndexOf(List.SelectedItems.Cast<ListItem>().MinBy(i => List.Items.IndexOf(i))!);
+                EndMarquee();
+                Check("끌어서 여러 개 선택: 화면 밖까지 59개 (3~61번째)", cnt == 59 && firstSel == 2, $"{cnt}개, 시작 {firstSel}");
+            }
+            else Check("끌어서 여러 개 선택: 목록 스크롤 영역 찾기", false);
+
+            // 큰 아이콘 보기에서 범위 선택
+            Navigate(new Location(LocKind.Dir, Path: P("Downloads")));
+            SetViewMode(true);
+            await Settle(900);
+            if (FindListScroll() && List.ItemContainerGenerator.ContainerFromIndex(0) is ListViewItem t0
+                && List.ItemContainerGenerator.ContainerFromIndex(1) is ListViewItem t1)
+            {
+                var a0 = t0.TranslatePoint(new Point(-2, -2), _mScp);
+                var a1 = t1.TranslatePoint(new Point(t1.ActualWidth / 2, t1.ActualHeight / 2), _mScp);
+                List.SelectedItems.Clear();
+                ArmMarqueeAt(a0);
+                StartMarquee();
+                UpdateMarquee(a1);
+                await Settle(300);
+                Shot("10_범위선택_큰아이콘");
+                var cnt = List.SelectedItems.Count;
+                EndMarquee();
+                Check("큰 아이콘 보기 범위 선택: 2개", cnt == 2, $"{cnt}개");
+            }
+            else Check("큰 아이콘 보기 칸 찾기", false);
+            SetViewMode(false);
+
+            // 20) 창 두 개: 한 창에서 복사 → 다른 창의 색인 폴더에 붙여넣기 = 연결 (복사본 안 생김)
+            var w2 = App.OpenWindow(new Location(LocKind.IndexFolder, r.Id), this);
+            await Settle(900);
+            Navigate(new Location(LocKind.Dir, Path: P("새 폴더 (2)")));
+            await Settle(400);
+            SelectNamed("설계서_v1.pptx");
+            CopySelected(cut: false);
+            w2.TestPaste();
+            await Settle(700);
+            var design = _store.ByPath(P(@"새 폴더 (2)\설계서_v1.pptx"));
+            Check("다른 창에 붙여넣기 = 색인 연결, 복사본 안 생김",
+                design?.Folders.Contains(r.Id) == true && !File.Exists(Path.Combine(S, "정기 보고", "설계서_v1.pptx")));
+            Check("다른 창 목록에도 바로 반영", w2.TestItemNames().Contains("설계서_v1.pptx"));
+            await Settle(300);
+            Check("두 번째 창 색인 표시 공유", w2.TestItemNames().Count == _store.FilesIn(r.Id).Count());
+            w2.TestShot("11_두번째창");
+            w2.Close();
         }
         catch (Exception ex)
         {

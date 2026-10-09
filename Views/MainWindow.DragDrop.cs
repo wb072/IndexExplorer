@@ -26,7 +26,7 @@ public partial class MainWindow
 
     private sealed record DropTarget(DropKind Kind, long FolderId = 0, string Path = "", TreeNode? Node = null, ListItem? Item = null);
 
-    private DragPayload? _drag;
+    private static DragPayload? _drag; // 다른 창으로 끌어다 놓아도 앱 안의 동작으로 처리
     private Point _dragStart;
     private object? _dragArmedOn;
     private ListViewItem? _pendingSingleSelect;
@@ -42,18 +42,30 @@ public partial class MainWindow
         _dragStart = e.GetPosition(this);
         _dragArmedOn = null;
         _pendingSingleSelect = null;
+        _rowClick = null;
         var src = e.OriginalSource as DependencyObject;
         if (FindAncestor<TextBox>(src) != null) return;
+        if (FindAncestor<System.Windows.Controls.Primitives.ScrollBar>(src) != null || FindAncestor<GridViewColumnHeader>(src) != null) return;
         var container = FindAncestor<ListViewItem>(src);
         if (container == null)
         {
-            // 빈 곳을 누르면 선택 해제 (탐색기와 같음)
-            if (FindAncestor<System.Windows.Controls.Primitives.ScrollBar>(src) == null && FindAncestor<GridViewColumnHeader>(src) == null)
-            {
-                List.SelectedItems.Clear();
-                List.Focus();
-            }
+            // 빈 곳: 선택 해제 (탐색기와 같음), 그대로 끌면 범위 선택
+            if ((Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == 0) List.SelectedItems.Clear();
+            List.Focus();
+            if (ArmMarquee(e)) e.Handled = true;
             return;
+        }
+        if (List.View != null && !IsOnNameContent(src, container))
+        {
+            // 자세히 보기에서 이름 글자 밖: 누르면 그 줄 선택, 끌면 범위 선택
+            if (e.ClickCount == 2 && container.DataContext is ListItem li) { Open([li]); e.Handled = true; return; }
+            if (ArmMarquee(e))
+            {
+                _rowClick = container;
+                container.Focus();
+                e.Handled = true;
+                return;
+            }
         }
         _dragArmedOn = container;
         // 여러 개를 선택한 상태에서 그중 하나를 누르면, 끌기를 위해 선택을 유지한다
@@ -67,6 +79,15 @@ public partial class MainWindow
 
     private void List_PreviewLeftUp(object sender, MouseButtonEventArgs e)
     {
+        if (_marqueeArmed)
+        {
+            var wasActive = _marqueeActive;
+            var row = _rowClick;
+            EndMarquee();
+            _rowClick = null;
+            if (!wasActive && row != null) RowClickSelect(row);
+            return;
+        }
         if (_pendingSingleSelect is { DataContext: ListItem item })
         {
             List.SelectedItems.Clear();
@@ -85,6 +106,13 @@ public partial class MainWindow
 
     private void List_PreviewMouseMove(object sender, MouseEventArgs e)
     {
+        if (_marqueeArmed)
+        {
+            if (e.LeftButton != MouseButtonState.Pressed) { EndMarquee(); return; }
+            if (!_marqueeActive && DragMoved(e)) StartMarquee();
+            if (_marqueeActive) UpdateMarquee();
+            return;
+        }
         if (_dragArmedOn == null || e.LeftButton != MouseButtonState.Pressed || !DragMoved(e)) return;
         _dragArmedOn = null;
         _pendingSingleSelect = null;

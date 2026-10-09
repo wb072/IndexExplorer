@@ -18,7 +18,7 @@ public partial class MainWindow
     /// <summary>앱 안에서 복사/잘라내기한 내용 (탐색기와 주고받는 FileDrop 과 함께 쓴다).</summary>
     private sealed record ClipState(string Token, List<string> Paths, List<long> FileIds, List<long> FolderIds, long? SourceFolder, bool Cut);
 
-    private ClipState? _clip;
+    private static ClipState? _clip; // 창끼리 공유
 
     private (string Dir, IndexFolder? PinnedBy) StorageOf(long folderId) => _store.StorageDir(folderId, _settings.StorageRoot);
 
@@ -802,6 +802,8 @@ public partial class MainWindow
             extras.Add(new("원본 위치 열기", () => RevealOriginal(sel[0])));
         if (files.Count > 0)
             extras.Add(new("색인에 추가…", () => BuildFolderPicker(id => LinkItems(id, files)).IsOpen = true));
+        if (sel.Count == 1 && sel[0].Kind is ItemKind.Dir or ItemKind.Drive)
+            extras.Insert(0, new("새 창에서 열기", () => OpenNewWindow(new Location(LocKind.Dir, Path: sel[0].Path))));
 
         ShellContextMenu.Show(this, sel.Select(i => i.Path).ToList(), extras, verb =>
         {
@@ -831,6 +833,7 @@ public partial class MainWindow
             var id = ids[0];
             var f = _store.Folder(id);
             Add("열기", () => Navigate(new Location(LocKind.IndexFolder, id)), "Enter");
+            Add("새 창에서 열기", () => OpenNewWindow(new Location(LocKind.IndexFolder, id)));
             Add("새 하위 폴더", () => { Navigate(new Location(LocKind.IndexFolder, id)); NewFolder(); });
             Add("이름 바꾸기", () =>
             {
@@ -957,7 +960,7 @@ public partial class MainWindow
                 break;
             }
             case NodeKind.Dir:
-                ShellContextMenu.Show(this, [node.Path], [], verb =>
+                ShellContextMenu.Show(this, [node.Path], [new("새 창에서 열기", () => OpenNewWindow(new Location(LocKind.Dir, Path: node.Path)))], verb =>
                 {
                     switch (verb)
                     {

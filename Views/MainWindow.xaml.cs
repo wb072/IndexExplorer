@@ -55,28 +55,39 @@ public partial class MainWindow : Window
     private bool _syncingTree, _settingMode, _settingSearch;
     private string _folderSignature = "";
 
-    public MainWindow()
+    private readonly Location? _startLoc;
+
+    /// <summary>App.OpenWindow 가 위치를 정해 준 창 (저장된 위치로 덮어쓰지 않는다).</summary>
+    public bool KeepPosition { get; set; }
+
+    public MainWindow(Location? start = null)
     {
         InitializeComponent();
-        _settings = Settings.Load();
-        _store = new IndexStore(Path.Combine(Settings.DataDir, "index.db"));
-        _indexer = new Indexer(_store, _settings, Dispatcher);
+        _startLoc = start;
+        _settings = App.Settings;
+        _store = App.Store;
+        _indexer = App.Indexer;
 
         _refreshTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, (_, _) => OnRefreshTick(), Dispatcher) { IsEnabled = false };
         _searchTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(160), DispatcherPriority.Input, (_, _) => { _searchTimer!.Stop(); RunSearch(); }, Dispatcher) { IsEnabled = false };
         _toastTimer = new DispatcherTimer(TimeSpan.FromSeconds(5), DispatcherPriority.Normal, (_, _) => HideToast(), Dispatcher) { IsEnabled = false };
 
-        _store.Changed += () => { _refreshTimer.Stop(); _refreshTimer.Start(); };
-        _indexer.Status += s => StatusRight.Text = s;
+        _store.Changed += OnStoreChanged;
+        _indexer.Status += OnIndexerStatus;
+        StatusRight.Text = _indexer.LastStatus;
         Closing += OnClosing;
         Loaded += OnLoaded;
     }
+
+    private void OnStoreChanged() { _refreshTimer.Stop(); _refreshTimer.Start(); }
+    private void OnIndexerStatus(string s) => StatusRight.Text = s;
 
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
         ShellImages.Scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
-        RestoreBounds_();
+        if (!KeepPosition) RestoreBounds_();
+        else SidebarCol.Width = new GridLength(Math.Clamp(_settings.SidebarWidth, 170, 480));
 
         _grid = (GridView)FindResource("DetailsView");
         string[] keys = ["Name", "Modified", "Type", "Size", "Location", "Index"];
@@ -96,11 +107,13 @@ public partial class MainWindow : Window
         PhysTree.ItemsSource = _physNodes;
         BuildIndexTree();
         BuildPhysTree();
-        Navigate(new Location(LocKind.IndexRoot), record: false);
+        Navigate(_startLoc ?? new Location(LocKind.IndexRoot), record: false);
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        if (App.IndexerStarted) { StartDirWatcher(); return; } // 두 번째 이후 창
+        App.IndexerStarted = true;
         if (App.SelfTestOut != null)
         {
             _indexer.Start();
@@ -146,8 +159,10 @@ public partial class MainWindow : Window
         _settings.SidebarWidth = SidebarCol.ActualWidth;
         _settings.Save();
         _dirWatcher?.Dispose();
-        _indexer.Dispose();
-        _store.Dispose();
+        _store.Changed -= OnStoreChanged;
+        _indexer.Status -= OnIndexerStatus;
+        _refreshTimer.Stop();
+        _toastTimer.Stop();
     }
 
     // ===================== 트리 =====================
@@ -432,6 +447,12 @@ public partial class MainWindow : Window
         if (from.Kind == LocKind.IndexFolder) SelectKeys(["F" + from.FolderId]);
     }
 
+    private void NewWindow_Click(object sender, RoutedEventArgs e) => OpenNewWindow();
+
+    /// <summary>지금 보고 있는 곳을 새 창으로 (검색 중이면 검색 전 위치).</summary>
+    private void OpenNewWindow(Location? at = null) =>
+        App.OpenWindow(at ?? (_loc.Kind == LocKind.Search ? _beforeSearch ?? _lastIndexLoc : _loc), this);
+
     private void Back_Click(object sender, RoutedEventArgs e) => GoBack();
     private void Forward_Click(object sender, RoutedEventArgs e) => GoForward();
     private void Up_Click(object sender, RoutedEventArgs e) => GoUp();
@@ -681,6 +702,8 @@ public partial class MainWindow : Window
 
     private void List_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_marqueeUpdating) return; // 범위 선택 중에는 끝날 때 한 번만 갱신
+        if (List.SelectedItems.Count == 1) _anchor = List.SelectedItem as ListItem;
         UpdateStatus();
         UpdatePreview();
         UpdateCommandStates();
@@ -1074,6 +1097,7 @@ public partial class MainWindow : Window
             case Key.D2 when ctrl: Navigate(_lastPhysLoc); break;
             case Key.P when alt: PreviewToggle_Click(this, e); break;
             case Key.N when ctrlShift: NewFolder(); break;
+            case Key.N when ctrl: OpenNewWindow(); break;
             case Key.D6 when ctrlShift: SetViewMode(false); break;
             case Key.D2 when ctrlShift: SetViewMode(true); break;
             case Key.Escape when none:
