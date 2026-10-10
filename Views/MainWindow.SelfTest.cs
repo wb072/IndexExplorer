@@ -331,6 +331,22 @@ public partial class MainWindow
             if (hdr != null)
                 _results.Add($"INFO  열 제목 위치: 목록 위에서 {hdr.TranslatePoint(new Point(0, 0), List).Y}px, 높이 {hdr.ActualHeight}px, 목록 위치 {List.TranslatePoint(new Point(0, 0), (UIElement)Content).Y}px");
 
+            // 23) 메뉴 항목 강조 색 (첫 항목에 키보드 포커스 = 마우스 올림과 같은 강조)
+            var testMenu = new ContextMenu { PlacementTarget = List };
+            testMenu.Items.Add(new MenuItem { Header = "열기" });
+            testMenu.Items.Add(new MenuItem { Header = "새 창에서 열기" });
+            testMenu.Items.Add(new MenuItem { Header = "이름 바꾸기", InputGestureText = "F2" });
+            testMenu.IsOpen = true;
+            await Settle(300);
+            ((MenuItem)testMenu.Items[1]).Focus();
+            await Settle(300);
+            var mrtb = new RenderTargetBitmap((int)(testMenu.ActualWidth * 1.0), (int)(testMenu.ActualHeight * 1.0), 96, 96, PixelFormats.Pbgra32);
+            mrtb.Render(testMenu);
+            var menc = new PngBitmapEncoder();
+            menc.Frames.Add(BitmapFrame.Create(mrtb));
+            using (var mfs = File.Create(Path.Combine(App.SelfTestOut!, "15_메뉴강조.png"))) menc.Save(mfs);
+            testMenu.IsOpen = false;
+
             // 20) 창 두 개: 한 창에서 복사 → 다른 창의 색인 폴더에 붙여넣기 = 연결 (복사본 안 생김)
             var w2 = App.OpenWindow(new Location(LocKind.IndexFolder, r.Id), this);
             await Settle(900);

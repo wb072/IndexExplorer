@@ -24,6 +24,10 @@
     <SolidColorBrush x:Key="RowHoverBrush" Color="#F0F6FE" />
     <!-- 모든 마우스 올림은 같은 파란색 하나, 누름·켜짐은 한 단계 진하게 -->
     <SolidColorBrush x:Key="PressBlueBrush" Color="#E2EEFC" />
+    <!-- 우클릭·드롭다운 메뉴 항목의 마우스 올림도 같은 파란색 (Fluent 테마 색 이름 덮어쓰기) -->
+    <SolidColorBrush x:Key="MenuBarItemBackgroundPointerOver" Color="#F0F6FE" />
+    <SolidColorBrush x:Key="MenuBarItemBackgroundMousePointer" Color="#F0F6FE" />
+    <SolidColorBrush x:Key="MenuBarItemBackgroundSelected" Color="#E2EEFC" />
     <SolidColorBrush x:Key="SelectBrush" Color="#DDEBFC" />
     <SolidColorBrush x:Key="SelectBorderBrush" Color="#8FBDF0" />
     <SolidColorBrush x:Key="SelectInactiveBrush" Color="#E9F2FD" />
