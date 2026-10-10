@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using IndexExplorer.Services;
@@ -60,6 +60,7 @@ public partial class App : Application
         // 자체 검증 중에는 실제 서비스에 붙지 않는다 (INDEXEXPLORER_SELFTEST_ENGINE=1 이면 실제 엔진으로 화면 확인)
         Engine.Disabled = SelfTestOut != null && Environment.GetEnvironmentVariable("INDEXEXPLORER_SELFTEST_ENGINE") != "1";
         Settings = Settings.Load();
+        IndexExplorer.Engine.FileKinds.SetCurrent(Settings.EnabledKinds());
         Store = new IndexStore(Path.Combine(Settings.DataDir, "index.db"));
         Indexer = new Indexer(Store, Settings, Dispatcher);
         new MainWindow().Show();

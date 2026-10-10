@@ -1,3 +1,4 @@
+﻿using IndexExplorer.Engine;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
@@ -69,6 +70,28 @@ public partial class MainWindow
     }
     internal List<string> TestItemNames() => _items.Select(i => i.Name).ToList();
     internal void TestShot(string name) => Shot(name);
+
+    /// <summary>다른 창(설정 등)을 PNG로.</summary>
+    private static void TestShotWindow(Window w, string name)
+    {
+        w.UpdateLayout();
+        var root = (FrameworkElement)w.Content;
+        var dpi = VisualTreeHelper.GetDpi(w);
+        var size = new Rect(0, 0, root.ActualWidth, root.ActualHeight);
+        var dv = new DrawingVisual();
+        using (var dc = dv.RenderOpen())
+        {
+            dc.DrawRectangle(w.Background, null, size);
+            dc.DrawRectangle(new VisualBrush(root), null, size);
+        }
+        var rtb = new RenderTargetBitmap((int)(size.Width * dpi.DpiScaleX), (int)(size.Height * dpi.DpiScaleY),
+            96 * dpi.DpiScaleX, 96 * dpi.DpiScaleY, PixelFormats.Pbgra32);
+        rtb.Render(dv);
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(rtb));
+        using var fs = File.Create(Path.Combine(App.SelfTestOut!, name + ".png"));
+        enc.Save(fs);
+    }
 
     private ListItem? ItemNamed(string name) => _items.FirstOrDefault(i => i.Name == name);
 
@@ -557,6 +580,73 @@ public partial class MainWindow
                 var q50 = big.Query(1, null, false, 100_000);
                 Check("엔진: 50만 개 — 담기·세기·엑셀 조회", cnt[1] == 50_000 && q50.Count == 50_000 && countMs < 500,
                     $"담기 {buildMs}ms, 종류별 세기 {countMs}ms, 엑셀 5만 개 경로까지 {swE.ElapsedMilliseconds}ms, 메모리 약 {big.EstimatedBytes / (1024 * 1024)}MB");
+
+                // 사용자가 정한 파일 종류: 엔진은 요청에 담긴 표로 판정 (다시 읽지 않음)
+                var kv = new IndexExplorer.Engine.VolumeIndex("K:");
+                kv.Write(v =>
+                {
+                    v.Upsert(10, 5, "작업", Dir);
+                    v.Upsert(11, 10, "분석.py", 0x20);
+                    v.Upsert(12, 10, "노트.IPYNB", 0x20);
+                    v.Upsert(13, 10, "설정.json", 0x20);
+                    v.Upsert(14, 10, "표.xlsx", 0x20);
+                });
+                var plain = kv.CountByKind(false);
+                var mine = new IndexExplorer.Engine.KindMap([
+                    .. FileKinds.Builtin.Select(k => new IndexExplorer.Engine.KindDef(k.Id, k.Exts)),
+                    new IndexExplorer.Engine.KindDef(13, ["py", "ipynb"]),
+                    new IndexExplorer.Engine.KindDef(64, ["json"]),          // 텍스트의 json 을 가져감
+                ]);
+                var withPy = kv.CountByKind(false, null, mine);
+                Check("파일 종류 지정: 기본 표에서는 .py 가 어느 종류에도 없음", plain[13] == 0 && plain[6] == 1, $"파이썬 {plain[13]}, 텍스트 {plain[6]}");
+                Check("파일 종류 지정: 파이썬을 켜면 .py·.ipynb (대소문자 무시)", withPy[13] == 2 && kv.Query(13, null, false, 10, null, mine).Count == 2, $"{withPy[13]}개");
+                Check("파일 종류 지정: 같은 확장자는 나중에 만든 종류가 가져감", withPy[64] == 1 && withPy[6] == 0 && withPy[1] == 1, $"새 종류 {withPy[64]}, 텍스트 {withPy[6]}");
+                kv.Write(v => v.Upsert(15, 10, "새것.py", 0x20));
+                Check("파일 종류 지정: 새로 생긴 파일도 바로", kv.CountByKind(false, null, mine)[13] == 3);
+                Check("파일 종류 지정: 확장자 입력 정리", string.Join(",", FileKinds.ParseExts("*.PY, ipynb;  .pyw  py")) == "py,ipynb,pyw");
+            }
+
+            // 26-2) 설정에서 파일 종류 켜기 → 사이드바·화면
+            {
+                var py = _settings.Kinds.First(k => k.Id == 13);
+                Check("파일 종류 설정: 처음엔 기본 11가지만 켜짐, 추가 종류는 꺼짐",
+                    _settings.Kinds.Count(k => k.Enabled) == 11 && !py.Enabled && ShownKinds.Count() == 11, $"켜짐 {_settings.Kinds.Count(k => k.Enabled)}");
+                py.Enabled = true;
+                _settings.Kinds.Add(new KindSetting { Id = 64, Name = "도면 원본", Exts = ["dwg"], Enabled = true });
+                FileKinds.SetCurrent(_settings.EnabledKinds());
+                OnKindsChanged();
+                await Settle(300);
+                Check("파일 종류 설정: 켜면 사이드바에 나옴 (순서대로, 새 종류는 끝)",
+                    KindNode(13) != null && KindNode(64) != null && _kindsNode.Children.Last() == KindNode(64) && FileKinds.Of("a.py") == 13,
+                    string.Join(" ", _kindsNode.Children.Select(c => c.Name)));
+                _kindsNode.IsExpanded = true;
+                Navigate(new Location(LocKind.FileKind, 64));
+                await Settle(300);
+                Check("파일 종류 설정: 새 종류 화면", _loc.Kind == LocKind.FileKind && _tab.Title == "도면 원본" && PvTitle.Text == "도면 원본", PvTitle.Text);
+                Shot("24_파일종류_사용자지정");
+                // 설정 창 모습
+                var setw = new SettingsWindow(_settings, firstRun: false) { Owner = this, ShowActivated = false, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual };
+                setw.Left = SystemParameters.VirtualScreenLeft - 2000;
+                setw.Top = 0;
+                setw.Show();
+                await Settle(600);
+                setw.TestScrollTo("KindsCard");
+                await Settle(300);
+                TestShotWindow(setw, "25_설정_파일종류");
+                setw.Close();
+                var ed = new KindEditWindow(py.Clone(), _settings.Kinds, isNew: false)
+                    { Owner = this, ShowActivated = false, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = SystemParameters.VirtualScreenLeft - 1000, Top = 0 };
+                ed.Show();
+                await Settle(400);
+                TestShotWindow(ed, "26_파일종류_편집");
+                ed.Close();
+                // 끄면 사라지고, 보고 있던 종류가 꺼지면 "모든 파일"로
+                _settings.Kinds.RemoveAll(k => k.Id == 64);
+                py.Enabled = false;
+                FileKinds.SetCurrent(_settings.EnabledKinds());
+                OnKindsChanged();
+                await Settle(300);
+                Check("파일 종류 설정: 끄면 사라지고 보던 화면은 모든 파일로", KindNode(13) == null && KindNode(64) == null && _loc.Kind == LocKind.AllFiles);
             }
 
             // 27) 파일 종류 화면 (엔진 없이 = 색인한 폴더 안에서)

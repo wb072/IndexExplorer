@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 
 namespace IndexExplorer.Engine;
@@ -138,12 +138,12 @@ public sealed class EngineHost : IDisposable
     // ===================== 조회 =====================
 
     /// <summary>종류별 개수 (모든 드라이브 합).</summary>
-    public int[] Counts(bool includeSystem, IReadOnlyCollection<string>? excludes = null)
+    public int[] Counts(bool includeSystem, IReadOnlyCollection<string>? excludes = null, KindMap? map = null)
     {
-        var total = new int[FileKinds.All.Length + 1];
+        var total = new int[256];
         foreach (var v in Volumes)
         {
-            var c = v.CountByKind(includeSystem, excludes);
+            var c = v.CountByKind(includeSystem, excludes, map);
             for (int i = 0; i < total.Length; i++) total[i] += c[i];
         }
         return total;
@@ -152,12 +152,12 @@ public sealed class EngineHost : IDisposable
     public sealed record Item(string Path, long Size, long ModifiedUtcTicks, uint Attr, uint Serial, ulong Frn);
 
     /// <summary>종류·검색어로 찾고, 크기·수정 시각은 실제 파일에서 읽어 붙인다 (장부에는 없으므로).</summary>
-    public List<Item> Query(byte kind, string? text, bool includeSystem, int max, IReadOnlyCollection<string>? excludes = null)
+    public List<Item> Query(byte kind, string? text, bool includeSystem, int max, IReadOnlyCollection<string>? excludes = null, KindMap? map = null)
     {
         var result = new List<Item>();
         foreach (var v in Volumes)
         {
-            foreach (var h in v.Query(kind, text, includeSystem, max - result.Count, excludes))
+            foreach (var h in v.Query(kind, text, includeSystem, max - result.Count, excludes, map))
             {
                 long size = 0, mtime = 0;
                 try

@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text;
 
 namespace IndexExplorer.Engine;
@@ -25,7 +25,10 @@ public sealed class VolumeIndex
     private int[] _nameOff = new int[1024];
     private ushort[] _nameLen = new ushort[1024];
     private uint[] _attr = new uint[1024];
-    private byte[] _kind = new byte[1024];
+    private byte[] _kind = new byte[1024];   // 고정 표 기준 종류 (잡동사니 판별용)
+    private ushort[] _ext = new ushort[1024]; // 확장자 번호 (사용자가 정한 종류는 요청마다 이 번호로 판정)
+    private readonly Dictionary<string, ushort> _extId = new(StringComparer.OrdinalIgnoreCase) { [""] = 0 };
+    private readonly List<string> _exts = [""];
     private int _slots;                       // 쓴 칸 수 (지운 칸 포함)
     private readonly Stack<int> _free = new();
     private readonly Dictionary<ulong, int> _slotOf = new(1 << 16);
@@ -163,7 +166,8 @@ public sealed class VolumeIndex
             var oldParent = _parent[s];
             _parent[s] = parent;
             _attr[s] = attr;
-            _kind[s] = (attr & AttrDirectory) != 0 ? FileKinds.None : FileKinds.Of(name);
+            _kind[s] = (attr & AttrDirectory) != 0 ? FileKinds.None : FileKinds.Fixed.Of(name);
+            _ext[s] = (attr & AttrDirectory) != 0 ? (ushort)0 : ExtId(name);
             if (!sameName || oldParent != parent)
             {
                 // 이름이 바뀌기 전 판단은 기록이 없으므로, 새 이름 기준으로만 다시 센다 (드묾)
@@ -178,12 +182,37 @@ public sealed class VolumeIndex
         _frn[s] = frn;
         _parent[s] = parent;
         _attr[s] = attr;
-        _kind[s] = (attr & AttrDirectory) != 0 ? FileKinds.None : FileKinds.Of(name);
+        _kind[s] = (attr & AttrDirectory) != 0 ? FileKinds.None : FileKinds.Fixed.Of(name);
+        _ext[s] = (attr & AttrDirectory) != 0 ? (ushort)0 : ExtId(name);
         _nameLen[s] = 0;
         SetName(s, name);
         _slotOf[frn] = s;
         if (_kind[s] == SystemKind) CountSys(parent, +1);
         if ((attr & AttrDirectory) == 0 && IsProjectMarker(name)) CountProj(parent, +1);
+    }
+
+    /// <summary>확장자 번호 (처음 보는 확장자는 새 번호). 쓰기 잠금 안에서. 너무 길거나 번호가 바닥나면 0(없음).</summary>
+    private ushort ExtId(ReadOnlySpan<char> name)
+    {
+        var dot = name.LastIndexOf('.');
+        if (dot < 0 || dot == name.Length - 1 || name.Length - dot - 1 > 16) return 0;
+        var ext = name[(dot + 1)..];
+        var lookup = _extId.GetAlternateLookup<ReadOnlySpan<char>>();
+        if (lookup.TryGetValue(ext, out var id)) return id;
+        if (_exts.Count >= ushort.MaxValue) return 0;
+        var s = ext.ToString().ToLowerInvariant();
+        id = (ushort)_exts.Count;
+        _exts.Add(s);
+        _extId[s] = id;
+        return id;
+    }
+
+    /// <summary>확장자 번호 → 종류 번호 표 (요청마다, 읽기 잠금 안에서). 확장자는 이 PC 전체에 수천 가지라 즉시 만든다.</summary>
+    private byte[] KindTable(KindMap map)
+    {
+        var table = new byte[_exts.Count];
+        for (int i = 1; i < table.Length; i++) table[i] = map.OfExt(_exts[i]);
+        return table;
     }
 
     public void Remove(ulong frn)
@@ -196,6 +225,7 @@ public sealed class VolumeIndex
         _frn[s] = 0;
         _nameLen[s] = 0;
         _kind[s] = 0;
+        _ext[s] = 0;
         _free.Push(s);
     }
 
@@ -258,6 +288,7 @@ public sealed class VolumeIndex
         Array.Resize(ref _nameLen, size);
         Array.Resize(ref _attr, size);
         Array.Resize(ref _kind, size);
+        Array.Resize(ref _ext, size);
     }
 
     // ===================== 조회 =====================
@@ -346,16 +377,17 @@ public sealed class VolumeIndex
         includeSystem || ((_attr[s] & (AttrHidden | AttrSystem)) == 0 && !UnderSystem(s) && (ex == null || !InExcluded(s, ex)));
 
     /// <summary>종류별 파일 수.</summary>
-    public int[] CountByKind(bool includeSystem, IReadOnlyCollection<string>? excludes = null)
+    public int[] CountByKind(bool includeSystem, IReadOnlyCollection<string>? excludes = null, KindMap? map = null)
     {
-        var counts = new int[FileKinds.All.Length + 1];
+        var counts = new int[256];
         _lock.EnterReadLock();
         try
         {
             var ex = includeSystem ? null : ResolveExcludes(excludes);
+            var table = KindTable(map ?? FileKinds.Fixed);
             foreach (var s in _slotOf.Values)
             {
-                var k = _kind[s];
+                var k = table[_ext[s]];
                 if (k == FileKinds.None || (_attr[s] & AttrDirectory) != 0) continue;
                 if (Visible(s, includeSystem, ex)) counts[k]++;
             }
@@ -367,7 +399,7 @@ public sealed class VolumeIndex
     public sealed record Hit(ulong Frn, string Path, uint Attr);
 
     /// <summary>종류(0이면 전체)와 이름 검색어(공백으로 나눈 단어 모두 포함)로 파일 찾기.</summary>
-    public List<Hit> Query(byte kind, string? text, bool includeSystem, int max, IReadOnlyCollection<string>? excludes = null)
+    public List<Hit> Query(byte kind, string? text, bool includeSystem, int max, IReadOnlyCollection<string>? excludes = null, KindMap? map = null)
     {
         var words = (text ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var hits = new List<Hit>();
@@ -375,10 +407,11 @@ public sealed class VolumeIndex
         try
         {
             var ex = includeSystem ? null : ResolveExcludes(excludes);
+            var table = KindTable(map ?? FileKinds.Fixed);
             foreach (var s in _slotOf.Values)
             {
                 if ((_attr[s] & AttrDirectory) != 0) continue;
-                if (kind != FileKinds.None && _kind[s] != kind) continue;
+                if (kind != FileKinds.None && table[_ext[s]] != kind) continue;
                 if (words.Length > 0)
                 {
                     var name = _pool.AsSpan(_nameOff[s], _nameLen[s]);
@@ -426,7 +459,7 @@ public sealed class VolumeIndex
         get
         {
             _lock.EnterReadLock();
-            try { return (long)_frn.Length * (8 + 8 + 4 + 2 + 4 + 1) + _pool.Length * 2L + _slotOf.Count * 24L; }
+            try { return (long)_frn.Length * (8 + 8 + 4 + 2 + 4 + 1 + 2) + _pool.Length * 2L + _slotOf.Count * 24L; }
             finally { _lock.ExitReadLock(); }
         }
     }

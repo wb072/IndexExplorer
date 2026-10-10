@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.ServiceProcess;
 using IndexExplorer.Engine;
@@ -52,7 +52,7 @@ public static class Program
         sw.Restart();
         var cn = c.AskAsync(new EngineProtocol.Request { Op = "counts" }).GetAwaiter().GetResult();
         log.Add($"종류별 개수 응답: {sw.ElapsedMilliseconds}ms");
-        if (cn?.Counts != null) foreach (var k in FileKinds.All) log.Add($"  {k.Name,-8} {cn.Counts[k.Id],8:N0}");
+        if (cn?.Counts != null) foreach (var k in FileKinds.Builtin) log.Add($"  {k.Name,-8} {cn.Counts[k.Id],8:N0}");
         sw.Restart();
         var q = c.AskAsync(new EngineProtocol.Request { Op = "query", Kind = 7, Max = 20000 }, 30000).GetAwaiter().GetResult();
         log.Add($"이미지 조회: {q?.Items?.Count:N0}개 {sw.ElapsedMilliseconds}ms");
@@ -87,7 +87,7 @@ public static class Program
             log.Add("");
             foreach (var v in host.Volumes) log.Add($"{v.Root}  {v.Count:N0}개  메모리 약 {v.EstimatedBytes / (1024 * 1024):N0}MB  변경 기록 {v.JournalId:X}");
             log.Add("종류별 (사용자 파일 / 전체):");
-            foreach (var k in FileKinds.All) log.Add($"  {k.Name,-8} {counts[k.Id],9:N0} / {all[k.Id],9:N0}");
+            foreach (var k in FileKinds.Builtin) log.Add($"  {k.Name,-8} {counts[k.Id],9:N0} / {all[k.Id],9:N0}");
             var sw2 = Stopwatch.StartNew();
             var excel = host.Query(1, null, false, 100000);
             log.Add($"엑셀 조회 {excel.Count:N0}개 (크기·날짜 포함) {sw2.ElapsedMilliseconds}ms");

@@ -1,4 +1,4 @@
-using System.IO.Pipes;
+﻿using System.IO.Pipes;
 using System.Security.AccessControl;
 using System.Security.Principal;
 
@@ -70,15 +70,16 @@ public sealed class EnginePipeServer : IDisposable
     {
         try
         {
-            var resp = new EngineProtocol.Response { Ok = true, Version = _host.Version, Files = _host.Volumes.Sum(v => (long)v.Count) };
+            var resp = new EngineProtocol.Response { Ok = true, Proto = EngineProtocol.CurrentProto, Version = _host.Version, Files = _host.Volumes.Sum(v => (long)v.Count) };
+            var map = req.Kinds is { Count: > 0 } k ? new KindMap(k) : null;
             switch (req.Op)
             {
                 case "status": resp.State = _host.State.ToDictionary(kv => kv.Key, kv => kv.Value); break;
                 case "counts":
-                    resp.Counts = _host.Counts(req.IncludeSystem, req.Excludes);
-                    resp.AllCounts = _host.Counts(includeSystem: true);
+                    resp.Counts = _host.Counts(req.IncludeSystem, req.Excludes, map);
+                    resp.AllCounts = _host.Counts(includeSystem: true, map: map);
                     break;
-                case "query": resp.Items = _host.Query(req.Kind, req.Text, req.IncludeSystem, Math.Clamp(req.Max, 1, 200_000), req.Excludes); break;
+                case "query": resp.Items = _host.Query(req.Kind, req.Text, req.IncludeSystem, Math.Clamp(req.Max, 1, 200_000), req.Excludes, map); break;
                 default: return new EngineProtocol.Response { Ok = false, Error = "알 수 없는 요청" };
             }
             return resp;

@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Security.Principal;
 using IndexExplorer.Engine;
@@ -14,7 +14,27 @@ public partial class SettingsWindow : Window
     private readonly Settings _settings;
     private readonly ObservableCollection<string> _roots;
     private readonly ObservableCollection<string> _kindEx;
+    private readonly ObservableCollection<KindRow> _kinds;
+    private readonly string _kindsBefore;
     private string _storage;
+
+    /// <summary>파일 종류 설정이 바뀌었나 (저장했을 때).</summary>
+    public bool KindsChanged { get; private set; }
+
+    /// <summary>설정 화면의 파일 종류 한 줄.</summary>
+    public sealed class KindRow : CommunityToolkit.Mvvm.ComponentModel.ObservableObject
+    {
+        public KindSetting S { get; }
+        public KindRow(KindSetting s) { S = s; }
+        public bool Enabled { get => S.Enabled; set { if (S.Enabled != value) { S.Enabled = value; OnPropertyChanged(); } } }
+        public string Name => S.Name;
+        public string ExtShort => string.Join(" ", S.Exts);
+        public string ExtTip => string.Join(", ", S.Exts.Select(e => "." + e));
+        public System.Windows.Media.ImageSource? Icon => S.Exts.Count > 0 ? Native.ShellImages.Icon("x." + S.Exts[0], false) : null;
+    }
+
+    private static string KindsSignature(IEnumerable<KindSetting> kinds) =>
+        string.Join("|", kinds.Select(k => $"{k.Id}:{k.Name}:{k.Enabled}:{string.Join(",", k.Exts)}"));
 
     public SettingsWindow(Settings settings, bool firstRun)
     {
@@ -26,6 +46,11 @@ public partial class SettingsWindow : Window
         _kindEx = new ObservableCollection<string>(settings.KindExcludes);
         KindExList.ItemsSource = _kindEx;
         KindExCard.Visibility = _kindEx.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        settings.NormalizeKinds();
+        _kindsBefore = KindsSignature(settings.Kinds);
+        _kinds = new ObservableCollection<KindRow>(settings.Kinds.Select(k => new KindRow(k.Clone())));
+        KindList.ItemsSource = _kinds;
+        MaxHeight = SystemParameters.WorkArea.Height - 40;
         StorageText.Text = _storage;
         UpdateEngineStatus();
         if (firstRun)
@@ -47,6 +72,45 @@ public partial class SettingsWindow : Window
         EngineStatus.Foreground = (System.Windows.Media.Brush)FindResource(running ? "PinBadgeBrush" : "SecondaryBrush");
         EngineInstallBtn.Content = s == "설치 안 됨" ? "설치" : "다시 설치";
         EngineRemoveBtn.IsEnabled = s != "설치 안 됨";
+        if (running) _ = CheckEngineVersion();
+    }
+
+    /// <summary>실행 중인 엔진이 예전 버전이면 (직접 정한 파일 종류를 모름) 업데이트를 권한다.</summary>
+    private async Task CheckEngineVersion()
+    {
+        var r = await App.Engine.AskAsync(new EngineProtocol.Request { Op = "status" }, 2000);
+        if (r is not { Ok: true } || r.Proto >= EngineProtocol.CurrentProto) return;
+        EngineStatus.Text = "업데이트 필요";
+        EngineBadge.Background = (System.Windows.Media.Brush)FindResource("SidebarBrush");
+        EngineStatus.Foreground = (System.Windows.Media.Brush)FindResource("SecondaryBrush");
+        EngineInstallBtn.Content = "업데이트";
+    }
+
+    /// <summary>자체 검증: 이름 붙은 카드가 보이게 스크롤.</summary>
+    internal void TestScrollTo(string name)
+    {
+        if (FindName(name) is FrameworkElement fe) fe.BringIntoView();
+    }
+
+    private void EditKind_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: KindRow row }) return;
+        var copy = row.S.Clone();
+        var w = new KindEditWindow(copy, _kinds.Where(r => r != row).Select(r => r.S).ToList(), isNew: false) { Owner = this };
+        if (w.ShowDialog() != true) return;
+        var i = _kinds.IndexOf(row);
+        if (w.Deleted) { _kinds.RemoveAt(i); return; }
+        _kinds[i] = new KindRow(copy);
+    }
+
+    private void AddKind_Click(object sender, RoutedEventArgs e)
+    {
+        var used = _kinds.Select(r => (int)r.S.Id).ToHashSet();
+        var id = Enumerable.Range(FileKinds.FirstCustomId, 255 - FileKinds.FirstCustomId).FirstOrDefault(n => !used.Contains(n));
+        if (id == 0) return;
+        var k = new KindSetting { Id = (byte)id, Name = "", Enabled = true };
+        var w = new KindEditWindow(k, _kinds.Select(r => r.S).ToList(), isNew: true) { Owner = this };
+        if (w.ShowDialog() == true && !w.Deleted) _kinds.Add(new KindRow(k));
     }
 
     /// <summary>같은 exe 를 관리자 권한으로 실행해 서비스를 설치·제거 (권한 확인 창 1회).</summary>
@@ -119,6 +183,9 @@ public partial class SettingsWindow : Window
         _settings.WatchedRoots = _roots.ToList();
         _settings.StorageRoot = _storage;
         _settings.KindExcludes = _kindEx.ToList();
+        var kinds = _kinds.Select(r => r.S).ToList();
+        KindsChanged = KindsSignature(kinds) != _kindsBefore;
+        _settings.Kinds = kinds;
         DialogResult = true;
     }
 }

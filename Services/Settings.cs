@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 
 namespace IndexExplorer.Services;
@@ -22,6 +22,9 @@ public sealed class Settings
 
     /// <summary>파일 종류 보기에서 직접 뺀 폴더 (그 아래 전체가 안 보인다).</summary>
     public List<string> KindExcludes { get; set; } = [];
+
+    /// <summary>파일 종류 (켜기·끄기, 확장자, 사용자가 만든 종류). 순서대로 사이드바에 나온다.</summary>
+    public List<KindSetting> Kinds { get; set; } = [];
     public bool IconView { get; set; }
     public bool PreviewPane { get; set; } = true;
     public double Left { get; set; } = double.NaN;
@@ -45,8 +48,38 @@ public sealed class Settings
         catch { s = new(); }
         if (string.IsNullOrWhiteSpace(s.StorageRoot)) s.StorageRoot = DefaultStorageRoot();
         if (s.WatchedRoots.Count == 0 && !s.FirstRunDone) s.WatchedRoots = DefaultRoots();
+        s.NormalizeKinds();
         return s;
     }
+
+    /// <summary>기본·추가 종류가 빠짐없이 있게 맞춘다 (새 버전에서 추가 종류가 늘어도). 처음이면 기본 종류만 켠다.</summary>
+    public void NormalizeKinds()
+    {
+        Kinds.RemoveAll(k => k.Id == Engine.FileKinds.SystemId || k.Id == Engine.FileKinds.None);
+        Kinds = Kinds.GroupBy(k => k.Id).Select(g => g.First()).ToList();
+        var defaults = Engine.FileKinds.Defaults.Where(k => !k.Hidden).ToList();
+        // 기본 종류 순서를 지키며 빠진 것을 제자리에 끼운다
+        for (int i = 0; i < defaults.Count; i++)
+        {
+            var d = defaults[i];
+            if (Kinds.Any(k => k.Id == d.Id)) continue;
+            var before = Kinds.FindIndex(k => k.Id > d.Id && k.Id < Engine.FileKinds.FirstCustomId);
+            var item = new KindSetting { Id = d.Id, Name = d.Name, Exts = [.. d.Exts], Enabled = d.Id < Engine.FileKinds.Presets[0].Id };
+            if (before < 0) { var firstCustom = Kinds.FindIndex(k => k.Id >= Engine.FileKinds.FirstCustomId); Kinds.Insert(firstCustom < 0 ? Kinds.Count : firstCustom, item); }
+            else Kinds.Insert(before, item);
+        }
+        foreach (var k in Kinds)
+        {
+            k.Exts = Engine.FileKinds.ParseExts(string.Join(",", k.Exts ?? [])).ToList();
+            if (string.IsNullOrWhiteSpace(k.Name)) k.Name = Engine.FileKinds.Defaults.FirstOrDefault(d => d.Id == k.Id)?.Name ?? "종류";
+        }
+    }
+
+    /// <summary>켠 종류를 엔진·화면이 쓰는 형태로.</summary>
+    public List<Engine.FileKinds.Kind> EnabledKinds() =>
+        Kinds.Where(k => k.Enabled && k.Exts.Count > 0)
+            .Select(k => new Engine.FileKinds.Kind(k.Id, k.Name, "." + k.Exts[0], [.. k.Exts]))
+            .ToList();
 
     public void Save()
     {
@@ -86,6 +119,19 @@ public sealed class Settings
             if (!result.Any(r => PathUtil.IsUnder(p, r))) result.Add(p);
         return result;
     }
+}
+
+/// <summary>파일 종류 하나의 설정.</summary>
+public sealed class KindSetting
+{
+    public byte Id { get; set; }
+    public string Name { get; set; } = "";
+    public List<string> Exts { get; set; } = [];
+    public bool Enabled { get; set; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsCustom => Id >= Engine.FileKinds.FirstCustomId;
+    public KindSetting Clone() => new() { Id = Id, Name = Name, Exts = [.. Exts], Enabled = Enabled };
 }
 
 public static class KnownFolders

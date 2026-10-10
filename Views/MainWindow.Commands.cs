@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -1034,6 +1034,11 @@ public partial class MainWindow
         {
             _settings.Save();
             _indexer.Start();
+            if (w.KindsChanged)
+            {
+                Engine.FileKinds.SetCurrent(_settings.EnabledKinds());
+                foreach (var mw in Application.Current.Windows.OfType<MainWindow>()) mw.OnKindsChanged();
+            }
             RefreshNow();
         }
     }

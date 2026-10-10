@@ -1,4 +1,4 @@
-<!--
+﻿<!--
     Apple 스타일 디자인 토큰 (AlarmApp 과 같은 계열)
     - 강조색은 Action Blue 하나 (#0066CC)
     - 그림자 없이 헤어라인과 여백으로 구분, 둥근 모서리
@@ -178,6 +178,36 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Cp" Property="Opacity" Value="0.7" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 체크 상자: 윈도우 강조색(사용자마다 다름)이 아니라 앱의 파란색. 켜지면 파란 바탕 + 흰 체크, 꺼지면 가는 테두리 -->
+    <Style x:Key="BlueCheck" TargetType="CheckBox">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <Border Background="Transparent" Padding="4">
+                        <Border x:Name="Box" Width="16" Height="16" CornerRadius="4" Background="White"
+                                BorderBrush="#C5CBD3" BorderThickness="1">
+                            <Path x:Name="Mark" Data="M3.5,8.2 L6.6,11.2 L12.5,4.8" Stroke="White" StrokeThickness="1.8"
+                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Visibility="Collapsed"
+                                  Margin="-1" />
+                        </Border>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Box" Property="Background" Value="{StaticResource AccentBrush}" />
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            <Setter TargetName="Mark" Property="Visibility" Value="Visible" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -443,6 +473,34 @@
                 <ControlTemplate TargetType="TextBox">
                     <ScrollViewer x:Name="PART_ContentHost" Focusable="False" VerticalAlignment="Center"
                                   HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 대화상자 입력칸: 흰 바탕 + 가는 테두리, 누르면 파란 테두리. 선택 영역도 파란색 (윈도우 강조색을 쓰지 않음) -->
+    <Style x:Key="FormBox" TargetType="TextBox">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Padding" Value="5,7" />
+        <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
+        <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}" />
+        <Setter Property="SelectionBrush" Value="{StaticResource AccentBrush}" />
+        <Setter Property="SelectionOpacity" Value="0.25" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border x:Name="Bd" Background="White" BorderBrush="{StaticResource FieldBorderBrush}" BorderThickness="1" CornerRadius="8">
+                        <ScrollViewer x:Name="PART_ContentHost" Focusable="False" Margin="{TemplateBinding Padding}"
+                                      HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource SelectBorderBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

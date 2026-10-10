@@ -27,6 +27,8 @@ public partial class MainWindow
     /// <summary>모두 보기 (자동으로 숨긴 잡동사니·직접 뺀 폴더도 보임).</summary>
     private bool _kindShowAll;
     private static string _engineFiles = "";
+    /// <summary>엔진의 기능 수준. 2 미만(예전 엔진)이면 사용자가 정한 종류를 모르므로 그 종류는 색인한 폴더 안에서만 보여 준다.</summary>
+    private static int _engineProto;
 
     private (byte kind, int count, List<EngineHost.Item> items)? _kindResult;
     private bool _kindLoading;
@@ -35,7 +37,13 @@ public partial class MainWindow
 
     public const int KindQueryMax = 20000;
 
-    private static IEnumerable<FileKinds.Kind> ShownKinds => FileKinds.All.Where(k => !k.Hidden);
+    private static IEnumerable<FileKinds.Kind> ShownKinds => FileKinds.Current.Where(k => !k.Hidden);
+
+    /// <summary>이 종류를 엔진이 PC 전체에서 찾아 줄 수 있나 (예전 엔진은 기본 종류만, 기본 확장자로).</summary>
+    private static bool EngineServes(byte kind) => _engineUp && (_engineProto >= EngineProtocol.CurrentProto || kind < FileKinds.Presets[0].Id);
+
+    /// <summary>엔진을 새 버전으로 바꿔야 설정한 종류가 PC 전체에 적용된다.</summary>
+    private static bool EngineOutdated => _engineUp && _engineProto < EngineProtocol.CurrentProto;
 
     private ImageSource? KindIcon(byte id) =>
         FileKinds.ById(id) is { } k ? ShellImages.Icon("x" + k.SampleExt, false) : null;
@@ -64,7 +72,7 @@ public partial class MainWindow
 
     private async Task PollEngine()
     {
-        var r = await App.Engine.AskAsync(new EngineProtocol.Request { Op = "counts", Excludes = _settings.KindExcludes }, 3000);
+        var r = await App.Engine.AskAsync(new EngineProtocol.Request { Op = "counts", Excludes = _settings.KindExcludes, Kinds = FileKinds.CurrentDefs }, 3000);
         var up = r is { Ok: true, Counts: not null };
         var wasUp = _engineUp;
         _engineUp = up;
@@ -72,6 +80,7 @@ public partial class MainWindow
         {
             _engineCounts = r!.Counts;
             _engineAllCounts = r.AllCounts;
+            _engineProto = r.Proto;
             _engineFiles = $"파일 {r.Files:N0}개";
         }
         UpdateKindBadges();
@@ -96,24 +105,24 @@ public partial class MainWindow
     {
         if (_kindNodes.Count == 0) return;
         int[]? local = null;
-        if (!_engineUp || _engineCounts == null)
+        if (!_engineUp || _engineCounts == null || EngineOutdated)
         {
-            // 엔진이 없으면 색인한 파일을 한 번만 훑어 모든 종류를 같이 센다
-            local = new int[FileKinds.All.Length + 1];
+            // 엔진이 없으면(또는 예전 엔진이 모르는 종류는) 색인한 파일을 한 번만 훑어 모든 종류를 같이 센다
+            local = new int[256];
             foreach (var f in _store.Files)
                 if (!f.Missing && !LocallyExcluded(f.Path)) local[FileKinds.Of(f.Name)]++;
         }
         foreach (var (id, node) in _kindNodes)
         {
-            var n = local != null ? local[id] : id < _engineCounts!.Length ? _engineCounts[id] : 0;
+            var n = EngineServes(id) && _engineCounts != null ? (id < _engineCounts.Length ? _engineCounts[id] : 0) : local![id];
             node.Badge = n > 0 ? n.ToString("N0") : "";
         }
     }
 
     private async void RequestKindItems(bool force = false)
     {
-        if (!_engineUp || _kindLoading) return;
         var kind = (byte)_loc.FolderId;
+        if (!EngineServes(kind) || _kindLoading) return;
         if (!force && _kindResult is { } cur && cur.kind == kind) return;
         if (!force && _kindFailed == kind) return;
         _kindLoading = true;
@@ -121,7 +130,7 @@ public partial class MainWindow
         {
             var resp = await App.Engine.AskAsync(new EngineProtocol.Request
             {
-                Op = "query", Kind = kind, Max = KindQueryMax, IncludeSystem = _kindShowAll, Excludes = _settings.KindExcludes,
+                Op = "query", Kind = kind, Max = KindQueryMax, IncludeSystem = _kindShowAll, Excludes = _settings.KindExcludes, Kinds = FileKinds.CurrentDefs,
             }, 30000);
             if (resp is not { Ok: true, Items: not null })
             {
@@ -144,7 +153,7 @@ public partial class MainWindow
     private void BuildKindItems(List<ListItem> list)
     {
         var kind = (byte)_loc.FolderId;
-        if (_engineUp)
+        if (EngineServes(kind))
         {
             if (_kindResult is { } res && res.kind == kind)
             {
@@ -164,6 +173,21 @@ public partial class MainWindow
             RequestKindItems();
         }
         list.AddRange(_store.Files.Where(f => !f.Missing && FileKinds.Of(f.Name) == kind && !LocallyExcluded(f.Path)).Select(FileItem));
+    }
+
+    /// <summary>설정에서 파일 종류가 바뀜: 사이드바를 다시 만들고, 지금 보는 종류가 꺼졌으면 "모든 파일"로.</summary>
+    public void OnKindsChanged()
+    {
+        _kindResult = null;
+        _kindFailed = null;
+        _engineCounts = null;
+        _engineAllCounts = null;
+        if (_loc.Kind == LocKind.FileKind && FileKinds.ById((byte)_loc.FolderId) is null)
+            Navigate(new Location(LocKind.AllFiles));
+        BuildIndexTree();
+        SyncTreeSelection();
+        _ = PollEngine();
+        LoadItems(reset: false);
     }
 
     private void SetKindShowAll(bool all)
@@ -207,9 +231,14 @@ public partial class MainWindow
             Value(string.Join(", ", k.Exts.Select(e => "." + e)));
         }
         Label("찾는 범위");
-        if (_engineUp)
+        if (EngineServes((byte)_loc.FolderId))
         {
             Badge($"PC 전체 · {_engineFiles}", true);
+            if (EngineOutdated)
+            {
+                Para("색인 엔진이 예전 버전이라 직접 바꾼 확장자가 PC 전체에는 아직 적용되지 않습니다. 설정에서 엔진을 업데이트하세요.");
+                Buttons(ActionButton("엔진 업데이트…", () => Settings_Click(this, new RoutedEventArgs()), primary: true));
+            }
             var id = (byte)_loc.FolderId;
             var hidden = (_engineAllCounts?[id] ?? 0) - (_engineCounts?[id] ?? 0);
             if (_kindShowAll)
@@ -228,6 +257,13 @@ public partial class MainWindow
                 if (_settings.KindExcludes.Count > 0) buttons.Add(ActionButton($"뺀 폴더 {_settings.KindExcludes.Count}개…", () => Settings_Click(this, new RoutedEventArgs())));
                 if (buttons.Count > 0) Buttons(buttons.ToArray());
             }
+        }
+        else if (_engineUp)
+        {
+            // 예전 엔진이 모르는 (새로 켠·만든) 종류
+            Badge("색인한 폴더 안에서만", false);
+            Para("이 종류를 PC 전체에서 찾으려면 색인 엔진을 새 버전으로 업데이트하세요. 관리자 승인이 한 번 필요합니다.");
+            Buttons(ActionButton("엔진 업데이트…", () => Settings_Click(this, new RoutedEventArgs()), primary: true));
         }
         else
         {

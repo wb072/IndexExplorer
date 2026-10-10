@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 
 namespace IndexExplorer.Engine;
@@ -19,13 +19,20 @@ public static class EngineProtocol
         public int Max { get; set; } = 20000;
         /// <summary>사용자가 직접 뺀 폴더.</summary>
         public List<string>? Excludes { get; set; }
+        /// <summary>지금 쓰는 파일 종류 (사용자 설정). 없으면 기본 종류.</summary>
+        public List<KindDef>? Kinds { get; set; }
     }
+
+    /// <summary>엔진이 알아듣는 기능 수준. 2 = 사용자가 정한 파일 종류.</summary>
+    public const int CurrentProto = 2;
 
     public sealed class Response
     {
         public bool Ok { get; set; }
         public string? Error { get; set; }
         public long Version { get; set; }
+        /// <summary>엔진의 기능 수준 (예전 엔진은 0).</summary>
+        public int Proto { get; set; }
         public long Files { get; set; }
         public int[]? Counts { get; set; }
         /// <summary>모두 보기 기준 개수 (숨긴 항목 수 = AllCounts - Counts).</summary>

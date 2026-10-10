@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using IndexExplorer.Engine;
@@ -77,11 +77,11 @@ public partial class MainWindow
         var list = new List<DuplicateFinder.Candidate>();
         if (_engineUp)
         {
-            foreach (var k in FileKinds.All.Where(k => !k.Hidden))
+            foreach (var k in ShownKinds)
             {
                 var r = await App.Engine.AskAsync(new EngineProtocol.Request
                 {
-                    Op = "query", Kind = k.Id, Max = 200_000, Excludes = _settings.KindExcludes,
+                    Op = "query", Kind = k.Id, Max = 200_000, Excludes = _settings.KindExcludes, Kinds = FileKinds.CurrentDefs,
                 }, 120_000);
                 if (r?.Items == null) continue;
                 list.AddRange(r.Items.Select(i => new DuplicateFinder.Candidate(i.Path, i.Size, i.ModifiedUtcTicks, i.Attr)));
