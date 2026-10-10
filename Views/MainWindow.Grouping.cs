@@ -10,7 +10,7 @@ using IndexExplorer.ViewModels;
 
 namespace IndexExplorer.Views;
 
-public enum GroupBy { None, Folder, Date, Type }
+public enum GroupBy { None, Folder, Date, Type, Duplicate }
 
 /// <summary>
 /// 묶어 보기 (탐색기의 그룹화): 폴더별 · 수정한 날짜별 · 유형별.
@@ -29,19 +29,30 @@ public partial class MainWindow
             DateBucket(((ListItem)item).Modified);
     }
 
-    private GroupBy DefaultGroupFor(LocKind k) => k == LocKind.FileKind ? _kindGroupPref : GroupBy.None;
+    private GroupBy DefaultGroupFor(LocKind k) => k switch
+    {
+        LocKind.FileKind => _kindGroupPref,
+        LocKind.Duplicates => GroupBy.Duplicate,
+        _ => GroupBy.None,
+    };
 
     private bool IsGrouped => _view.GroupDescriptions.Count > 0;
+    /// <summary>큰 아이콘 보기에서 이보다 많으면 묶지 않는다.</summary>
+    public const int TileGroupLimit = 3000;
+    private bool _groupSkipped;
 
     private void ApplyGrouping()
     {
         if (Resources["GroupFolderIcon"] == null) Resources["GroupFolderIcon"] = ShellImages.Icon(System.IO.Path.GetTempPath(), true);
         _view.GroupDescriptions.Clear();
+        _groupSkipped = _groupBy != GroupBy.None && _settings.IconView && _items.Count > TileGroupLimit;
+        if (_groupSkipped) return; // 큰 아이콘 + 아주 많은 항목: 묶음 안은 가상화가 안 되므로 묶지 않고 보여 준다
         GroupDescription? g = _groupBy switch
         {
             GroupBy.Folder => new PropertyGroupDescription(nameof(ListItem.Location)),
             GroupBy.Date => new DateGroup(),
             GroupBy.Type => new PropertyGroupDescription(nameof(ListItem.TypeName)),
+            GroupBy.Duplicate => new PropertyGroupDescription(nameof(ListItem.DupKey)),
             _ => null,
         };
         if (g != null) _view.GroupDescriptions.Add(g);
@@ -85,11 +96,12 @@ public partial class MainWindow
     }
 
     /// <summary>상태 표시줄용: 묶음 수 (예: "폴더 12곳").</summary>
-    private string GroupSummary() => !IsGrouped || _view.Groups == null ? "" : _groupBy switch
+    private string GroupSummary() => _groupSkipped ? $"     (항목이 많아 큰 아이콘에서는 묶지 않음)" : !IsGrouped || _view.Groups == null ? "" : _groupBy switch
     {
         GroupBy.Folder => $"     폴더 {_view.Groups.Count:N0}곳",
         GroupBy.Date => $"     날짜 묶음 {_view.Groups.Count:N0}개",
         GroupBy.Type => $"     유형 {_view.Groups.Count:N0}가지",
+        GroupBy.Duplicate => $"     같은 파일 묶음 {_view.Groups.Count:N0}개",
         _ => "",
     };
 }

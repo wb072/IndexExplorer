@@ -207,7 +207,8 @@
         </Style>
 
         <ItemsPanelTemplate x:Key="RowsPanel"><VirtualizingStackPanel Margin="0,4,0,0" /></ItemsPanelTemplate>
-        <ItemsPanelTemplate x:Key="TilesPanel"><WrapPanel Margin="8,6" /></ItemsPanelTemplate>
+        <!-- 큰 아이콘: 화면에 보이는 줄만 만든다 (수만 개도 즉시) -->
+        <ItemsPanelTemplate x:Key="TilesPanel"><local:VirtualizingTilePanel Margin="8,6" /></ItemsPanelTemplate>
 
         <!-- 주소 표시줄 한 칸 -->
         <DataTemplate DataType="{x:Type vm:CrumbSegment}">
@@ -562,7 +563,7 @@
 
         <!-- ===== 3행 가운데: 파일 목록 ===== -->
         <Grid Grid.Row="2" Grid.Column="1">
-            <ListView x:Name="List" BorderThickness="0" Background="Transparent" SelectionMode="Extended"
+            <local:FastListView x:Name="List" BorderThickness="0" Background="Transparent" SelectionMode="Extended"
                       VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel"
                       ScrollViewer.HorizontalScrollBarVisibility="Auto"
                       SelectionChanged="List_SelectionChanged" PreviewMouseLeftButtonDown="List_PreviewLeftDown" PreviewMouseLeftButtonUp="List_PreviewLeftUp"
@@ -570,10 +571,10 @@
                       AllowDrop="True" DragOver="List_DragOver" Drop="List_Drop" DragLeave="List_DragLeave"
                       GridViewColumnHeader.Click="Header_Click" KeyDown="List_KeyDown" LostMouseCapture="List_LostMouseCapture"
                       VirtualizingPanel.IsVirtualizingWhenGrouping="True">
-                <ListView.GroupStyle>
+                <local:FastListView.GroupStyle>
                     <GroupStyle ContainerStyle="{StaticResource GroupBox}" HidesIfEmpty="True" />
-                </ListView.GroupStyle>
-            </ListView>
+                </local:FastListView.GroupStyle>
+            </local:FastListView>
             <!-- 끌어서 여러 개 선택 (범위 선택) 사각형 -->
             <Canvas x:Name="MarqueeLayer" IsHitTestVisible="False">
                 <Rectangle x:Name="MarqueeRect" Visibility="Collapsed" Fill="#1A0066CC" Stroke="#B30066CC" StrokeThickness="1" RadiusX="2" RadiusY="2" />

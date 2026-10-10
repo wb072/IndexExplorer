@@ -93,9 +93,17 @@ public partial class MainWindow
     private void UpdateKindBadges()
     {
         if (_kindNodes.Count == 0) return;
+        int[]? local = null;
+        if (!_engineUp || _engineCounts == null)
+        {
+            // 엔진이 없으면 색인한 파일을 한 번만 훑어 모든 종류를 같이 센다
+            local = new int[FileKinds.All.Length + 1];
+            foreach (var f in _store.Files)
+                if (!f.Missing && !LocallyExcluded(f.Path)) local[FileKinds.Of(f.Name)]++;
+        }
         foreach (var (id, node) in _kindNodes)
         {
-            var n = _engineUp && _engineCounts != null && id < _engineCounts.Length ? _engineCounts[id] : LocalKindCount(id);
+            var n = local != null ? local[id] : id < _engineCounts!.Length ? _engineCounts[id] : 0;
             node.Badge = n > 0 ? n.ToString("N0") : "";
         }
     }

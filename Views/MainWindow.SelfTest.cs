@@ -57,6 +57,16 @@ public partial class MainWindow
     }
 
     internal void TestPaste() => Paste(_loc);
+
+    /// <summary>대량 시험: 디스크 없이 합성 항목을 목록에 넣는다 (화면 처리 속도만 잰다).</summary>
+    private void ShowItemsForTest(List<ListItem> list)
+    {
+        _items = new System.Collections.ObjectModel.ObservableCollection<ListItem>(list);
+        _view = new ListCollectionView(_items) { CustomSort = new ItemComparer(_sortKey, _sortDesc) };
+        ApplyGrouping();
+        List.ItemsSource = _view;
+        UpdateStatus();
+    }
     internal List<string> TestItemNames() => _items.Select(i => i.Name).ToList();
     internal void TestShot(string name) => Shot(name);
 
@@ -599,6 +609,124 @@ public partial class MainWindow
             await Settle(300);
             Check("묶어 보기: 탭마다 따로 기억", newTabGroup == GroupBy.Folder && _groupBy == GroupBy.Type && _loc.Kind == LocKind.Dir, $"새 탭 {newTabGroup}, 돌아온 탭 {_groupBy}");
             SetGroupBy(GroupBy.None);
+
+            // 29) 중복 파일: 이름이 달라도 내용이 같으면 묶고, 크기만 같은 파일은 빼고, 지울 때 색인 연결을 남는 파일로
+            {
+                var big = new byte[200_000];
+                new Random(7).NextBytes(big);
+                var nearly = (byte[])big.Clone();
+                nearly[^1] ^= 0xFF;                                            // 크기는 같고 마지막 1바이트만 다름
+                File.WriteAllBytes(P(@"업무\원본자료.bin"), big);
+                await Task.Delay(1100);
+                File.WriteAllBytes(P(@"Downloads\원본자료 (1).bin"), big);
+                await Task.Delay(1100);
+                File.WriteAllBytes(P(@"바탕 화면\받은 사본.bin"), big);
+                File.WriteAllBytes(P(@"새 폴더 (2)\비슷한것.bin"), nearly);
+                File.WriteAllText(P(@"업무\메모.txt"), new string('메', 1500));
+                File.WriteAllText(P(@"Downloads\메모 복사본.txt"), new string('메', 1500));
+                await WaitUntil(() => _store.ByPath(P(@"새 폴더 (2)\비슷한것.bin")) != null && _store.ByPath(P(@"Downloads\메모 복사본.txt")) != null, 15000);
+                var copy = _store.ByPath(P(@"바탕 화면\받은 사본.bin"))!;
+                _store.Link(r.Id, copy);                                        // 지울 사본이 색인에 연결되어 있다
+                var swD = Stopwatch.StartNew();
+                Navigate(new Location(LocKind.Duplicates));
+                await WaitUntil(() => !_dupRunning && _dupGroups != null, 30000);
+                var firstMs = swD.ElapsedMilliseconds;
+                await Settle(500);
+                var groupsNow = _items.Where(i => i.DupRank != null).GroupBy(i => i.DupRank).Select(g => g.Count()).OrderByDescending(x => x).ToList();
+                Check("중복 파일: 이름이 달라도 내용이 같은 묶음만 (크기만 같은 파일 제외)",
+                    groupsNow.SequenceEqual(new[] { 3, 2 }) && !_items.Any(i => i.Name == "비슷한것.bin"),
+                    $"묶음 {string.Join("+", groupsNow)}, {firstMs}ms, 상태 {_dupStatus}");
+                Check("중복 파일: 낭비 큰 묶음이 먼저", _items.First().Size == 200_000);
+                Shot("24_중복파일");
+                SelectAllButOne(Oldest, "가장 오래된 것만");
+                Check("중복 파일: 오래된 것만 남기고 선택", List.SelectedItems.Count == 3 && !Selected().Any(i => i.Name == "원본자료.bin"), $"{List.SelectedItems.Count}개");
+                DeleteSelected(shift: false);
+                HideToast();
+                await Settle(800);
+                var kept = _store.ByPath(P(@"업무\원본자료.bin"));
+                Check("중복 파일: 지운 사본의 색인 연결이 남은 파일로", kept != null && kept.Folders.Contains(r.Id) && !File.Exists(P(@"바탕 화면\받은 사본.bin")),
+                    kept == null ? "남은 파일 없음" : string.Join(",", kept.Folders));
+                Check("중복 파일: 다 정리하면 목록이 빔", _items.Count(i => i.DupRank != null) == 0, $"{_items.Count}개 남음");
+                // 다시 찾기 (지문 기억) — 같은 내용 파일을 다시 만들어 비교
+                File.WriteAllBytes(P(@"Downloads\또사본.bin"), big);
+                await WaitUntil(() => _store.ByPath(P(@"Downloads\또사본.bin")) != null, 10000);
+                _dupGroups = null;
+                swD.Restart();
+                StartDuplicateScan();
+                await WaitUntil(() => !_dupRunning && _dupGroups != null, 30000);
+                Check("중복 파일: 다시 찾기 (비교한 파일은 기억)", _dupGroups!.Count == 1 && _dupGroups[0].Files.Count == 2, $"{swD.ElapsedMilliseconds}ms");
+            }
+
+            // 30) 대량: 5만 개 목록 — 표시·전체 선택·하나만 남기고 선택·범위 선택·큰 아이콘·묶어 보기
+            {
+                Navigate(new Location(LocKind.Dir, Path: P("Downloads")));
+                await Settle(300);
+                var many = new List<ListItem>(50_000);
+                var now = DateTime.UtcNow;
+                for (int i = 0; i < 50_000; i++)
+                    many.Add(new ListItem
+                    {
+                        Kind = ItemKind.File, Path = $@"X:\대량\폴더{i % 200:D3}\파일{i:D5}.txt", Name = $"파일{i:D5}.txt", Size = 1000 + i,
+                        Modified = now.AddMinutes(-i), TypeName = "텍스트 문서", Location = $@"X:\대량\폴더{i % 200:D3}",
+                        DupKey = $"{i / 2}", DupRank = i / 2,
+                    });
+                var swB = Stopwatch.StartNew();
+                ShowItemsForTest(many);
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var showMs = swB.ElapsedMilliseconds;
+                swB.Restart();
+                List.SelectAll();
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var allMs = swB.ElapsedMilliseconds;
+                var allCount = List.SelectedItems.Count;
+                swB.Restart();
+                SelectAllButOne(Oldest, "가장 오래된 것만");
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var butOneMs = swB.ElapsedMilliseconds;
+                var butOneCount = List.SelectedItems.Count;
+                HideToast();
+                Check("대량 5만: 목록 표시", showMs < 2000, $"{showMs}ms");
+                Check("대량 5만: 전체 선택", allCount == 50_000 && allMs < 2000, $"{allMs}ms");
+                Check("대량 5만: 하나만 남기고 선택 (2만5천 묶음)", butOneCount == 25_000 && butOneMs < 5000, $"{butOneMs}ms (WPF 선택 처리 한계, 기준 5초)");
+                // 범위 선택: 맨 위에서 3만 번째 줄까지 (자동 스크롤 구간 포함)
+                List.SelectedItems.Clear();
+                if (FindListScroll() && RowGeometry() is { } g5)
+                {
+                    swB.Restart();
+                    ArmMarqueeAt(new Point(300, g5.origin + 0.5 * g5.h - _mSv!.VerticalOffset));
+                    StartMarquee();
+                    List.ScrollIntoView(List.Items[30_000]);
+                    await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                    var c30 = List.ItemContainerGenerator.ContainerFromIndex(30_000) as ListViewItem;
+                    UpdateMarquee(new Point(320, c30?.TranslatePoint(new Point(0, c30.ActualHeight / 2), _mScp).Y ?? 0));
+                    var mCount = List.SelectedItems.Count;
+                    EndMarquee();
+                    Check("대량 5만: 끌어서 3만 개 선택", mCount == 30_001 && swB.ElapsedMilliseconds < 3000, $"{mCount:N0}개 {swB.ElapsedMilliseconds}ms");
+                }
+                // 큰 아이콘: 화면에 보이는 칸만 만들어야 한다
+                swB.Restart();
+                SetViewMode(true);
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var tileMs = swB.ElapsedMilliseconds;
+                var made = FindDescendant<VirtualizingTilePanel>(List)?.Children.Count ?? -1;
+                swB.Restart();
+                FindDescendant<ScrollViewer>(List)!.ScrollToEnd();
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var endMs = swB.ElapsedMilliseconds;
+                var lastShown = FindDescendant<VirtualizingTilePanel>(List)!.Children.OfType<ListViewItem>().Any(c => (c.DataContext as ListItem)?.Name == "파일49999.txt");
+                Check("대량 5만: 큰 아이콘 (보이는 칸만 만듦)", made > 0 && made < 400 && tileMs < 2000, $"만든 칸 {made}개, {tileMs}ms");
+                Check("대량 5만: 큰 아이콘 맨 끝까지 스크롤", lastShown && endMs < 1000, $"{endMs}ms");
+                Shot("25_대량_큰아이콘");
+                SetViewMode(false);
+                // 묶어 보기 (자세히): 200개 폴더
+                swB.Restart();
+                SetGroupBy(GroupBy.Folder);
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                Check("대량 5만: 폴더별로 묶기 (200곳)", _view.Groups?.Count == 200 && swB.ElapsedMilliseconds < 3000, $"{swB.ElapsedMilliseconds}ms");
+                SetGroupBy(GroupBy.None);
+                Navigate(new Location(LocKind.Dir, Path: P("Downloads")));
+                await Settle(300);
+            }
 
             // 20) 창 두 개: 한 창에서 복사 → 다른 창의 색인 폴더에 붙여넣기 = 연결 (복사본 안 생김)
             var w2 = App.OpenWindow(new Location(LocKind.IndexFolder, r.Id), this);

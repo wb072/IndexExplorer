@@ -240,10 +240,8 @@ public partial class MainWindow
         _marqueeUpdating = true;
         try
         {
-            var current = List.SelectedItems.Cast<ListItem>().ToList();
-            foreach (var c in current) if (!target.Contains(c)) List.SelectedItems.Remove(c);
-            var had = current.ToHashSet();
-            foreach (var t in target) if (!had.Contains(t)) List.SelectedItems.Add(t);
+            var current = List.SelectedItems.Cast<ListItem>().ToHashSet();
+            if (!current.SetEquals(target)) List.SelectMany(target.ToList()); // 한 번에 (수만 개도 즉시)
         }
         finally { _marqueeUpdating = false; }
         UpdateStatus();
@@ -263,8 +261,9 @@ public partial class MainWindow
         else if (mods.HasFlag(ModifierKeys.Shift) && _anchor != null && List.Items.IndexOf(_anchor) is var a and >= 0)
         {
             var b = List.Items.IndexOf(item);
-            List.SelectedItems.Clear();
-            for (int i = Math.Min(a, b); i <= Math.Max(a, b); i++) List.SelectedItems.Add(List.Items[i]);
+            var range = new List<object>();
+            for (int i = Math.Min(a, b); i <= Math.Max(a, b); i++) range.Add(List.Items[i]);
+            List.SelectMany(range);
         }
         else
         {

@@ -15,7 +15,7 @@ using IndexExplorer.ViewModels;
 
 namespace IndexExplorer.Views;
 
-public enum LocKind { IndexRoot, IndexFolder, Recent, Inbox, AllFiles, FileKind, ThisPC, Dir, Search }
+public enum LocKind { IndexRoot, IndexFolder, Recent, Inbox, AllFiles, Duplicates, FileKind, ThisPC, Dir, Search }
 
 /// <summary>지금 보고 있는 곳.</summary>
 public sealed record Location(LocKind Kind, long FolderId = 0, string Path = "", string Query = "")
@@ -74,6 +74,7 @@ public partial class MainWindow : Window
         _toastTimer = new DispatcherTimer(TimeSpan.FromSeconds(5), DispatcherPriority.Normal, (_, _) => HideToast(), Dispatcher) { IsEnabled = false };
 
         _store.Changed += OnStoreChanged;
+        InitDuplicates();
         _indexer.Status += OnIndexerStatus;
         StatusRight.Text = _indexer.LastStatus;
         Closing += OnClosing;
@@ -211,12 +212,14 @@ public partial class MainWindow : Window
             _indexNodes.Add(_recentNode);
             _indexNodes.Add(_inboxNode);
             _indexNodes.Add(_allNode);
+            _indexNodes.Add(_dupNode = new TreeNode { Kind = NodeKind.Duplicates, Name = "중복 파일", Icon = (ImageSource)FindResource("IconDuplicates") });
             _indexNodes.Add(_kindsNode = BuildKindsNode(kindsExpanded));
         }
         finally { _syncingTree = false; }
         _folderSignature = FolderSignature();
         UpdateBadges();
         UpdateKindBadges();
+        UpdateDupBadge();
     }
 
     private void AddFolderNodes(TreeNode parent, long? parentId, HashSet<long> expanded)
@@ -310,6 +313,7 @@ public partial class MainWindow : Window
                 LocKind.Recent => _recentNode,
                 LocKind.Inbox => _inboxNode,
                 LocKind.AllFiles => _allNode,
+                LocKind.Duplicates => _dupNode,
                 LocKind.FileKind => KindNode(_loc.FolderId),
                 LocKind.ThisPC => _pcNode,
                 LocKind.Dir => RevealPhysNode(_loc.Path),
@@ -325,7 +329,7 @@ public partial class MainWindow : Window
 
     private void BringNodeIntoView(TreeNode node)
     {
-        var tree = node.IsIndex || node.Kind is NodeKind.Recent or NodeKind.Inbox or NodeKind.AllFiles or NodeKind.KindsRoot or NodeKind.FileKind ? IndexTree : PhysTree;
+        var tree = node.IsIndex || node.Kind is NodeKind.Recent or NodeKind.Inbox or NodeKind.AllFiles or NodeKind.Duplicates or NodeKind.KindsRoot or NodeKind.FileKind ? IndexTree : PhysTree;
         var chain = node.Ancestors().Reverse().Append(node).ToList();
         ItemsControl parent = tree;
         foreach (var n in chain)
@@ -377,6 +381,7 @@ public partial class MainWindow : Window
         NodeKind.Recent => new Location(LocKind.Recent),
         NodeKind.Inbox => new Location(LocKind.Inbox),
         NodeKind.AllFiles => new Location(LocKind.AllFiles),
+        NodeKind.Duplicates => new Location(LocKind.Duplicates),
         NodeKind.FileKind => new Location(LocKind.FileKind, n.FolderId),
         NodeKind.ThisPC => new Location(LocKind.ThisPC),
         NodeKind.Dir => new Location(LocKind.Dir, Path: n.Path),
@@ -623,6 +628,9 @@ public partial class MainWindow : Window
             case LocKind.FileKind:
                 BuildKindItems(list);
                 break;
+            case LocKind.Duplicates:
+                BuildDuplicateItems(list);
+                break;
             case LocKind.Search:
                 list.AddRange(_store.SearchFolders(_loc.Query).Select(f => FolderItem(f, withLocation: true)));
                 list.AddRange(_store.SearchFiles(_loc.Query).Take(5000).Select(FileItem));
@@ -722,8 +730,8 @@ public partial class MainWindow : Window
 
     private void UpdateColumns()
     {
-        var showLoc = _loc.Kind is LocKind.IndexFolder or LocKind.Recent or LocKind.Inbox or LocKind.AllFiles or LocKind.FileKind or LocKind.Search or LocKind.ThisPC;
-        var showIdx = _loc.Kind is LocKind.Dir or LocKind.Recent or LocKind.AllFiles or LocKind.FileKind or LocKind.Search;
+        var showLoc = _loc.Kind is LocKind.IndexFolder or LocKind.Recent or LocKind.Inbox or LocKind.AllFiles or LocKind.FileKind or LocKind.Duplicates or LocKind.Search or LocKind.ThisPC;
+        var showIdx = _loc.Kind is LocKind.Dir or LocKind.Recent or LocKind.AllFiles or LocKind.FileKind or LocKind.Duplicates or LocKind.Search;
         if (_groupBy == GroupBy.Folder) showLoc = false; // 폴더별로 묶으면 머리줄에 경로가 있으므로
         // 최근 문서에서는 날짜 열이 "마지막으로 쓴 때"
         _colInfo[_grid.Columns.First(col => _colInfo.TryGetValue(col, out var i) && i.key == "Modified")] = ("Modified", _loc.Kind == LocKind.Recent ? "최근 사용" : "수정한 날짜");
@@ -762,6 +770,7 @@ public partial class MainWindow : Window
             LocKind.Inbox => ("모두 분류했습니다", "새로 생기는 파일은 여기에 먼저 모입니다."),
             LocKind.Search => ("검색 결과가 없습니다", "다른 단어로 찾아보세요. 띄어 쓴 단어는 모두 포함된 파일을 찾습니다."),
             LocKind.AllFiles => ("색인된 파일이 없습니다", "설정에서 색인할 폴더를 추가하세요."),
+            LocKind.Duplicates => _dupRunning ? ("중복 파일을 찾는 중…", _dupStatus) : ("중복 파일이 없습니다", "내용이 같은 파일이 두 곳 이상에 있으면 여기에 모입니다."),
             LocKind.FileKind => _engineUp ? (_kindLoading ? ("PC 전체에서 찾는 중…", "") : ("이 종류의 파일이 없습니다", ""))
                 : ("색인한 폴더에 이 종류의 파일이 없습니다", "PC 전체에서 찾으려면 설정에서 색인 엔진을 설치하세요."),
             _ => ("이 폴더는 비어 있습니다", ""),
@@ -799,13 +808,9 @@ public partial class MainWindow : Window
     private void SelectKeys(IEnumerable<string> keys)
     {
         var set = keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        List.SelectedItems.Clear();
-        ListItem? first = null;
-        foreach (var i in _items.Where(i => set.Contains(i.Key)))
-        {
-            List.SelectedItems.Add(i);
-            first ??= i;
-        }
+        var pick = _items.Where(i => set.Contains(i.Key)).ToList();
+        List.SelectMany(pick);
+        var first = pick.FirstOrDefault();
         if (first != null)
         {
             List.ScrollIntoView(first);
@@ -833,6 +838,7 @@ public partial class MainWindow : Window
             var b = (ListItem)y!;
             int fa = a.IsFolderLike ? 0 : 1, fb = b.IsFolderLike ? 0 : 1;
             if (fa != fb) return fa - fb; // 폴더가 항상 위
+            if (a.DupRank is int ra && b.DupRank is int rb && ra != rb) return ra - rb; // 중복 묶음 순서 (낭비 큰 순)
             int r = key switch
             {
                 "Modified" => Nullable.Compare(a.Modified, b.Modified),
@@ -925,6 +931,7 @@ public partial class MainWindow : Window
         }
         DetailsBtn.IsChecked = !tiles;
         TilesBtn.IsChecked = tiles;
+        if (_view != null) { ApplyGrouping(); UpdateStatus(); }
     }
 
     private void DetailsView_Click(object sender, RoutedEventArgs e) => SetViewMode(false);
@@ -975,6 +982,7 @@ public partial class MainWindow : Window
             case LocKind.Recent: Add("최근 문서", _loc); break;
             case LocKind.Inbox: Add("미분류 함", _loc); break;
             case LocKind.AllFiles: Add("모든 파일", _loc); break;
+            case LocKind.Duplicates: Add("중복 파일", _loc); break;
             case LocKind.FileKind:
                 Add("파일 종류", _loc);
                 Add(FileKinds.ById((byte)_loc.FolderId)?.Name ?? "", _loc);

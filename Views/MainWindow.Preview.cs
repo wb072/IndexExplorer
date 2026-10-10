@@ -210,6 +210,9 @@ public partial class MainWindow
             case LocKind.FileKind:
                 ShowKindInfo();
                 break;
+            case LocKind.Duplicates:
+                ShowDuplicatesInfo();
+                break;
             case LocKind.AllFiles:
                 SetPreviewImage((ImageSource)FindResource("IconAllFiles"), true);
                 PvTitle.Text = "모든 파일";

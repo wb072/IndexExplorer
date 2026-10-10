@@ -53,6 +53,7 @@ public sealed class IndexStore : IDisposable
     {
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(dbPath)!);
         _db = new SqliteConnection($"Data Source={dbPath}");
+        _hashDb = new SqliteConnection($"Data Source={dbPath}"); // 중복 찾기(백그라운드)용 별도 연결
         _db.Open();
         Exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA foreign_keys=ON;");
         Exec("""
@@ -67,6 +68,9 @@ public sealed class IndexStore : IDisposable
                 folder_id INTEGER NOT NULL REFERENCES folders(id) ON DELETE CASCADE,
                 file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
                 PRIMARY KEY(folder_id, file_id));
+            CREATE TABLE IF NOT EXISTS file_hashes(
+                path TEXT NOT NULL PRIMARY KEY COLLATE NOCASE, size INTEGER NOT NULL, mtime INTEGER NOT NULL,
+                partial TEXT NULL, full TEXT NULL);
             """);
         Load();
     }
@@ -385,7 +389,55 @@ public sealed class IndexStore : IDisposable
         return _folders.Values.Where(f => words.All(w => f.Name.Contains(w, StringComparison.OrdinalIgnoreCase)));
     }
 
-    public void Dispose() => _db.Dispose();
+    // ===== 파일 지문 (중복 찾기) — 경로·크기·수정 시각이 같으면 다시 읽지 않는다 =====
+    private readonly object _hashLock = new();
+    private readonly SqliteConnection _hashDb;
+
+    private SqliteConnection HashDb()
+    {
+        if (_hashDb.State != System.Data.ConnectionState.Open) _hashDb.Open();
+        return _hashDb;
+    }
+
+    public (string? partial, string? full) GetHash(string path, long size, long mtimeTicks)
+    {
+        lock (_hashLock)
+        {
+            using var c = HashDb().CreateCommand();
+            c.CommandText = "SELECT partial, full FROM file_hashes WHERE path=$p AND size=$s AND mtime=$m";
+            c.Parameters.AddWithValue("$p", path);
+            c.Parameters.AddWithValue("$s", size);
+            c.Parameters.AddWithValue("$m", mtimeTicks);
+            using var r = c.ExecuteReader();
+            return r.Read() ? (r.IsDBNull(0) ? null : r.GetString(0), r.IsDBNull(1) ? null : r.GetString(1)) : (null, null);
+        }
+    }
+
+    public void PutHash(string path, long size, long mtimeTicks, string? partial, string? full)
+    {
+        lock (_hashLock)
+        {
+            using var c = HashDb().CreateCommand();
+            c.CommandText = """
+                INSERT INTO file_hashes(path, size, mtime, partial, full) VALUES($p,$s,$m,$a,$b)
+                ON CONFLICT(path) DO UPDATE SET size=$s, mtime=$m,
+                    partial=COALESCE($a, CASE WHEN file_hashes.size=$s AND file_hashes.mtime=$m THEN file_hashes.partial END),
+                    full=COALESCE($b, CASE WHEN file_hashes.size=$s AND file_hashes.mtime=$m THEN file_hashes.full END)
+                """;
+            c.Parameters.AddWithValue("$p", path);
+            c.Parameters.AddWithValue("$s", size);
+            c.Parameters.AddWithValue("$m", mtimeTicks);
+            c.Parameters.AddWithValue("$a", (object?)partial ?? DBNull.Value);
+            c.Parameters.AddWithValue("$b", (object?)full ?? DBNull.Value);
+            c.ExecuteNonQuery();
+        }
+    }
+
+    public void Dispose()
+    {
+        _hashDb.Dispose();
+        _db.Dispose();
+    }
 }
 
 /// <summary>탐색기와 같은 자연 정렬 (파일2 &lt; 파일10).</summary>

@@ -386,19 +386,23 @@ public partial class MainWindow
             return;
         }
 
+        MoveLinksToKeptDuplicates(files);
         // 원본이 이미 없는 항목은 색인에서만 지운다
         foreach (var m in files.Where(f => f.Missing).Select(f => f.Record).OfType<FileRecord>()) _store.Remove(m);
         var paths = files.Where(f => !f.Missing).Select(f => f.Path).ToList();
         if (paths.Count == 0) { RefreshNow(); return; }
-        if (ShellFileOps.Recycle(this, paths, confirm: true))
+        if (ShellFileOps.Recycle(this, paths, confirm: App.SelfTestOut == null))
         {
             _store.Batch(() =>
             {
+                var dirs = new List<string>();
                 foreach (var p in paths)
                 {
-                    if (_store.ByPath(p) is { } r && !File.Exists(p)) _store.Remove(r);
-                    foreach (var r2 in _store.Files.Where(f => PathUtil.IsUnder(f.Path, p) && !File.Exists(f.Path)).ToList()) _store.Remove(r2);
+                    if (_store.ByPath(p) is { } r) { if (!File.Exists(p)) _store.Remove(r); }
+                    else dirs.Add(p); // 색인에 없는 경로 = 폴더 → 안의 파일 정리
                 }
+                if (dirs.Count > 0)
+                    foreach (var r2 in _store.Files.Where(f => dirs.Any(d => PathUtil.IsUnder(f.Path, d)) && !File.Exists(f.Path)).ToList()) _store.Remove(r2);
             });
         }
         RefreshNow();

@@ -34,6 +34,10 @@ public sealed partial class ListItem : ObservableObject
     public string IndexText { get; init; } = "";
 
     public bool IsFolderLike => Kind != ItemKind.File;
+
+    /// <summary>중복 파일 보기: 묶음 이름(낭비 큰 순 번호 포함)과 순번.</summary>
+    public string DupKey { get; init; } = "";
+    public int? DupRank { get; init; }
     public string TypeName { get; init; } = "";
 
     public string ModifiedText => Modified is DateTime d ? d.ToLocalTime().ToString("yyyy-MM-dd tt h:mm") : "";
