@@ -257,11 +257,14 @@
                             <ItemsControl x:Name="DriveList">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1" Padding="0,9">
+                                        <Border BorderBrush="{StaticResource HairlineBrush}" BorderThickness="{Binding Border}" Padding="0,9">
                                             <DockPanel>
-                                                <TextBlock Text="&#xEDA2;" Style="{StaticResource Glyph}" Foreground="#6E7B8B" Margin="0,0,11,0" />
-                                                <TextBlock DockPanel.Dock="Left" Text="{Binding Key}" FontWeight="SemiBold" Width="34" VerticalAlignment="Center" />
-                                                <TextBlock Text="{Binding Value}" Foreground="{StaticResource SecondaryBrush}" FontSize="12.5" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                <Image Source="{Binding Icon}" Width="22" Height="22" Margin="0,0,12,0" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality" />
+                                                <Ellipse DockPanel.Dock="Right" Width="7" Height="7" Fill="#34C759" Visibility="{Binding LiveVis}" VerticalAlignment="Center" Margin="10,0,2,0" ToolTip="실시간 반영 중" />
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Name}" />
+                                                    <TextBlock Text="{Binding State}" Foreground="{StaticResource MutedBrush}" FontSize="11.5" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
                                             </DockPanel>
                                         </Border>
                                     </DataTemplate>

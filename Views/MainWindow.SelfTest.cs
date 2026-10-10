@@ -119,6 +119,29 @@ public partial class MainWindow
                 List.SelectedItems.Clear();
                 await Settle(600);
                 Shot("21_엔진_이미지");
+                Check("실제 엔진: 새 버전 (직접 정한 파일 종류를 앎)", _engineProto >= EngineProtocol.CurrentProto, $"기능 수준 {_engineProto}");
+                // 설정 › 색인 엔진 탭의 드라이브 목록
+                var ew = new SettingsWindow(_settings, firstRun: false)
+                    { Owner = this, ShowActivated = false, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = SystemParameters.VirtualScreenLeft - 2000, Top = 0 };
+                ew.Show();
+                ew.SelectTab("engine");
+                await WaitUntil(() => ew.TestDriveCount() > 0, 5000);
+                await Settle(400);
+                Check("실제 엔진: 설정에 드라이브 목록", ew.TestDriveCount() > 0, $"{ew.TestDriveCount()}개");
+                TestShotWindow(ew, "27_설정_엔진_실제");
+                ew.Close();
+                // 사용자가 켠 종류(파이썬)도 PC 전체에서
+                var pyOn = _settings.Kinds.First(k => k.Id == 13);
+                pyOn.Enabled = true;
+                FileKinds.SetCurrent(_settings.EnabledKinds());
+                OnKindsChanged();
+                await WaitUntil(() => _engineCounts != null, 5000);
+                Navigate(new Location(LocKind.FileKind, 13));
+                await WaitUntil(() => _kindResult is { kind: 13 }, 20000);
+                await Settle(500);
+                Check("실제 엔진: 켠 종류(파이썬)를 PC 전체에서", _kindResult is { kind: 13 } && EngineServes(13),
+                    $"{_items.Count:N0}개 (엔진 {_engineCounts?[13]:N0}), 숨긴 잡동사니 {(_engineAllCounts?[13] ?? 0) - (_engineCounts?[13] ?? 0):N0}개");
+                Shot("28_엔진_파이썬");
                 return;
             }
             // 0) 아이콘 크기별 선명도 비교용 (윈도우 아이콘은 16·32·48·256 크기를 갖고 있다)

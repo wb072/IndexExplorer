@@ -123,7 +123,9 @@ public partial class SettingsWindow : Window
         if (r is not { Ok: true }) return;
         if (r.State is { Count: > 0 } st)
         {
-            DriveList.ItemsSource = st.OrderBy(kv => kv.Key).ToList();
+            var drives = st.OrderBy(kv => kv.Key).ToList();
+            DriveList.ItemsSource = drives.Select((kv, i) => new DriveRow(kv.Key, DriveName(kv.Key), FriendlyState(kv.Value), i < drives.Count - 1, kv.Value.Contains("이어 읽는 중") || kv.Value.Contains("읽음"),
+                Native.ShellImages.Icon(kv.Key + "\\", true, 32, perPath: true))).ToList();
             EngineFiles.Text = $"모든 드라이브 합계 파일 {r.Files:N0}개";
             DrivesSection.Visibility = Visibility.Visible;
         }
@@ -135,6 +137,30 @@ public partial class SettingsWindow : Window
     }
 
     /// <summary>자체 검증: 이름 붙은 카드가 보이게 스크롤.</summary>
+    internal int TestDriveCount() => DriveList.Items.Count;
+
+    public sealed record DriveRow(string Root, string Name, string State, bool Line, bool Live, System.Windows.Media.ImageSource? Icon)
+    {
+        public Thickness Border => new(0, 0, 0, Line ? 1 : 0);
+        public Visibility LiveVis => Live ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private static string DriveName(string root)
+    {
+        try { var label = new DriveInfo(root).VolumeLabel; return label.Length > 0 ? $"{label} ({root})" : $"로컬 디스크 ({root})"; }
+        catch { return root; }
+    }
+
+    /// <summary>엔진의 드라이브 상태 문구를 사용자 말로: "저장한 목록 612,461개 불러옴 (597ms), 변경 기록 이어 읽는 중" → "파일 612,461개 · 바뀌는 즉시 반영".</summary>
+    private static string FriendlyState(string s)
+    {
+        var m = System.Text.RegularExpressions.Regex.Match(s, @"([\d,]+)개");
+        if (m.Success && (s.Contains("이어 읽는 중") || s.Contains("읽음"))) return $"파일 {m.Groups[1].Value}개 · 바뀌는 즉시 반영";
+        if (s.Contains("장부 읽는 중")) return "처음 읽는 중…";
+        if (s.StartsWith("변경 기록을 켰")) return "준비 중…";
+        return s;
+    }
+
     internal string TestVisiblePage() =>
         new FrameworkElement[] { PageGeneral, PageKinds, PageEngine, PageAbout }.Single(p => p.Visibility == Visibility.Visible).Name;
 
