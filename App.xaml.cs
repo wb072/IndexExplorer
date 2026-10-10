@@ -63,7 +63,18 @@ public partial class App : Application
         IndexExplorer.Engine.FileKinds.SetCurrent(Settings.EnabledKinds());
         Store = new IndexStore(Path.Combine(Settings.DataDir, "index.db"));
         Indexer = new Indexer(Store, Settings, Dispatcher);
-        new MainWindow().Show();
+        // 탐색기 창이 모두 닫히면 끝낸다 (다른 창이 남아 있어도: 만들다 실패한 창이 숨은 채 남아 프로그램이 안 끝나는 일이 없도록)
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        Track(new MainWindow()).Show();
+    }
+
+    private static MainWindow Track(MainWindow w)
+    {
+        w.Closed += (_, _) =>
+        {
+            if (!Current.Windows.OfType<MainWindow>().Any(x => x != w && x.IsLoaded)) Current.Shutdown();
+        };
+        return w;
     }
 
     private bool ClaimSingleInstance()
@@ -92,7 +103,7 @@ public partial class App : Application
     /// <summary>새 창 (Ctrl+N, exe 재실행, "새 창에서 열기").</summary>
     public static MainWindow OpenWindow(Location? start, Window? from = null)
     {
-        var w = new MainWindow(start);
+        var w = Track(new MainWindow(start));
         if (from is { WindowState: WindowState.Normal })
         {
             w.KeepPosition = true;
