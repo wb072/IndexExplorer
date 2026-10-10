@@ -75,6 +75,12 @@ public partial class MainWindow : Window
 
         _store.Changed += OnStoreChanged;
         InitDuplicates();
+        if (App.SelfTestOut != null)
+        {
+            // 자체 검증: 화면 밖에서 조용히 (작업 표시줄에도 안 보이고 포커스도 빼앗지 않는다)
+            ShowActivated = false;
+            ShowInTaskbar = false;
+        }
         _indexer.Status += OnIndexerStatus;
         StatusRight.Text = _indexer.LastStatus;
         Closing += OnClosing;
@@ -93,7 +99,8 @@ public partial class MainWindow : Window
         PsIcon.Source = ShellImages.Icon(SysExe(@"WindowsPowerShell\v1.0\powershell.exe"), false);
         // 원본 = 윈도우 "파일 탐색기" 프로그램 아이콘 그대로
         ModePhysIcon.Source = ShellImages.Icon(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"), false);
-        if (!KeepPosition) RestoreBounds_();
+        if (App.SelfTestOut != null) PlaceOffscreen();
+        else if (!KeepPosition) RestoreBounds_();
         else SidebarCol.Width = new GridLength(Math.Clamp(_settings.SidebarWidth, 170, 480));
 
         _grid = (GridView)FindResource("DetailsView");
@@ -140,6 +147,18 @@ public partial class MainWindow : Window
         }
         _indexer.Start();
         StartDirWatcher();
+    }
+
+    /// <summary>자체 검증용: 모든 모니터 바깥 (화면 캡처는 창 내용을 직접 그리므로 그대로 된다).</summary>
+    private void PlaceOffscreen()
+    {
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        WindowState = WindowState.Normal;
+        Width = Math.Max(MinWidth, _settings.Width);
+        Height = Math.Max(MinHeight, _settings.Height);
+        Left = SystemParameters.VirtualScreenLeft - Width - 200;
+        Top = SystemParameters.VirtualScreenTop;
+        SidebarCol.Width = new GridLength(Math.Clamp(_settings.SidebarWidth, 170, 480));
     }
 
     private void RestoreBounds_()

@@ -102,7 +102,7 @@ public partial class App : Application
             w.Height = from.Height;
         }
         w.Show();
-        w.Activate();
+        if (SelfTestOut == null) w.Activate(); // 자체 검증 중에는 포커스를 빼앗지 않는다
         return w;
     }
 

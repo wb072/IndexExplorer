@@ -76,7 +76,7 @@ dotnet build
 dotnet publish -c Release -p:PortableRelease=true -o release
 ```
 - `release\IndexExplorer.exe`: .NET 설치 없이 실행되는 단일 exe.
-- 자체 검증: `INDEXEXPLORER_DATA=<격리 폴더>`를 설정하고 `IndexExplorer.exe --selftest <결과 폴더> <테스트 루트>`로 실행한다. 실제 사용자 데이터와 분리된 상태에서 핵심 기능 85개 항목을 실행하고, `results.txt`와 화면 PNG를 남긴다. 테스트 루트에는 감시 폴더와 샘플 파일을 미리 만들어 둔다(`MainWindow.SelfTest.cs` 참고).
+- 자체 검증: `INDEXEXPLORER_DATA=<격리 폴더>`를 설정하고 `IndexExplorer.exe --selftest <결과 폴더> <테스트 루트>`로 실행한다. 실제 사용자 데이터와 분리된 상태에서 핵심 기능 85개 항목을 실행하고, `results.txt`와 화면 PNG를 남긴다. 검증 창은 화면 밖(가상 화면 왼쪽 바깥)에 띄우고 작업 표시줄에 넣지 않으며 포커스도 가져가지 않는다. 그래서 검증 중에도 사용자의 작업을 방해하지 않고, 캡처는 RenderTargetBitmap이라 그대로 된다. 테스트 루트에는 감시 폴더와 샘플 파일을 미리 만들어 둔다(`MainWindow.SelfTest.cs` 참고).
 - 화면 자동 입력이나 캡처는 PC 화면이 꺼져 있으면 동작하지 않는다. 자체 검증 모드를 우선 사용한다.
 
 ## 다음 후보
