@@ -133,7 +133,8 @@ internal static class ShellImages
             Signal.Wait();
             if (!Pending.TryPop(out var job)) continue;
             ImageSource? img = null;
-            try { img = Load(job.path, job.size, SIIGBF_RESIZETOFIT | SIIGBF_BIGGERSIZEOK); } catch { }
+            // 정확히 요청한 크기로 (더 큰 그림을 받아 줄이면 흐려진다)
+            try { img = Load(job.path, job.size, SIIGBF_RESIZETOFIT); } catch { }
             _ui!.BeginInvoke(DispatcherPriority.Background, () => job.done(img));
         }
     }

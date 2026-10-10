@@ -64,12 +64,18 @@ public sealed partial class ListItem : ObservableObject
         _ => ShellImages.Icon(Path, Kind == ItemKind.Dir),
     };
 
+    /// <summary>
+    /// 큰 아이콘 보기의 그림 크기. 화면에 그릴 크기 그대로(배율 반영 픽셀) 받아 와서 1:1 로 그려야 또렷하다
+    /// (작게 받아 키우거나 크게 받아 줄이면 흐려진다).
+    /// </summary>
+    public const int TileImageSize = 64;
+
     private ImageSource? _bigIcon;
     public ImageSource? BigIcon => _bigIcon ??= Kind switch
     {
-        ItemKind.IndexFolder => ShellImages.Icon(Settings.DataDir, true, 48),
-        ItemKind.Drive => ShellImages.Icon(Path, true, 48, perPath: true),
-        _ => ShellImages.Icon(Path, Kind == ItemKind.Dir, 48),
+        ItemKind.IndexFolder => ShellImages.Icon(Settings.DataDir, true, TileImageSize),
+        ItemKind.Drive => ShellImages.Icon(Path, true, TileImageSize, perPath: true),
+        _ => ShellImages.Icon(Path, Kind == ItemKind.Dir, TileImageSize),
     };
 
     private bool _thumbRequested;
@@ -79,7 +85,7 @@ public sealed partial class ListItem : ObservableObject
     {
         if (_thumbRequested || Kind != ItemKind.File || Missing) return;
         _thumbRequested = true;
-        ShellImages.RequestThumbnail(Path, 96, img => { if (img != null) Thumbnail = img; });
+        ShellImages.RequestThumbnail(Path, TileImageSize, img => { if (img != null) Thumbnail = img; });
     }
 
     /// <summary>같은 항목인지 (새로 고침 후 선택 유지용).</summary>

@@ -109,8 +109,9 @@
         <DataTemplate x:Key="TileTemplate" DataType="{x:Type vm:ListItem}">
             <StackPanel>
                 <Grid Height="68">
-                    <Image Source="{Binding DisplayImage}" MaxWidth="68" MaxHeight="64" Stretch="Uniform"
-                           HorizontalAlignment="Center" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality" />
+                    <!-- 늘리거나 줄이지 않고 받은 크기 그대로 (또렷하게) -->
+                    <Image Source="{Binding DisplayImage}" Stretch="None" SnapsToDevicePixels="True"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Grid>
                 <Grid Margin="0,4,0,0">
                     <TextBlock Text="{Binding Name}" TextWrapping="Wrap" TextAlignment="Center" TextTrimming="CharacterEllipsis"
