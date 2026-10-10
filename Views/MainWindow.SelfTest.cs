@@ -364,6 +364,28 @@ public partial class MainWindow
             await Settle(300);
             Check("탭 닫기", _tabs.Count == 1 && _tab == firstTab && _loc.FolderId == m.Id);
 
+            // 크롬식: 몇 개일 땐 넓게, 많아지면 함께 좁아지고, 최소 폭에서는 화살표
+            NewTab(new Location(LocKind.Recent));
+            NewTab(new Location(LocKind.Dir, Path: P("업무")));
+            await Settle(400);
+            var wideW = _tabPanel?.TabWidth ?? 0;
+            Shot("17_탭_3개");
+            for (int k = 0; k < 6; k++) NewTab(new Location(LocKind.Dir, Path: P("Downloads")));
+            await Settle(400);
+            var midW = _tabPanel?.TabWidth ?? 0;
+            var midOverflow = _tabPanel?.IsOverflowing ?? true;
+            Shot("18_탭_9개");
+            for (int k = 0; k < 8; k++) NewTab(new Location(LocKind.Inbox));
+            await Settle(500);
+            Check("탭: 적을 땐 넓게(220) → 많으면 함께 좁아짐 → 최소 폭에서 화살표",
+                wideW >= 219 && midW < wideW && midW > 96 && !midOverflow && _tabPanel!.IsOverflowing && TabRightBtn.Visibility == Visibility.Visible,
+                $"3개 {wideW:0}px, 9개 {midW:0}px, 17개 {_tabPanel?.TabWidth:0}px 넘침 {_tabPanel?.IsOverflowing}");
+            Check("마지막(지금) 탭이 보이도록 밀림", _tabPanel!.Offset > 0 && !_tabPanel.CanScrollRight);
+            Shot("19_탭_넘침");
+            while (_tabs.Count > 1) CloseTab(_tabs[^1]);
+            SwitchTo(_tabs[0]);
+            await Settle(300);
+
             // 20) 창 두 개: 한 창에서 복사 → 다른 창의 색인 폴더에 붙여넣기 = 연결 (복사본 안 생김)
             var w2 = App.OpenWindow(new Location(LocKind.IndexFolder, r.Id), this);
             await Settle(900);

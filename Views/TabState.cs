@@ -12,6 +12,8 @@ public sealed partial class TabState : ObservableObject
     [ObservableProperty] private string _title = "";
     [ObservableProperty] private ImageSource? _icon;
     [ObservableProperty] private bool _isActive;
+    /// <summary>오른쪽 구분선 (지금 탭 양옆·마지막 탭은 숨김, 크롬과 같음).</summary>
+    [ObservableProperty] private bool _showSeparator;
 
     public Location Loc { get; set; } = new(LocKind.IndexRoot);
     public List<Location> Back { get; set; } = [];      // 위에서부터 (Stack.ToList 순서)

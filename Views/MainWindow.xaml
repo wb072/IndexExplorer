@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:IndexExplorer.ViewModels"
+        xmlns:local="clr-namespace:IndexExplorer.Views"
         Title="색인 탐색기" Width="1180" Height="740" MinWidth="760" MinHeight="460"
         FontFamily="{StaticResource AppFont}" FontSize="13" Foreground="{StaticResource InkBrush}"
         Background="{StaticResource CanvasBrush}" UseLayoutRounding="True"
@@ -237,44 +238,71 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <StackPanel Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Bottom">
-                <ItemsControl x:Name="TabItems" Focusable="False">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border x:Name="Tab" Height="34" MinWidth="130" MaxWidth="240" CornerRadius="8,8,0,0" Padding="12,0,6,0" Margin="0,0,2,0"
-                                    Background="Transparent" WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="{Binding Title}"
-                                    MouseLeftButtonDown="Tab_MouseDown" MouseUp="Tab_MouseUp" AllowDrop="True" DragOver="Tab_DragOver">
-                                <DockPanel>
-                                    <Button x:Name="TabClose" DockPanel.Dock="Right" Style="{StaticResource TabMiniButton}" Margin="6,0,0,0"
-                                            Click="TabClose_Click" ToolTip="탭 닫기 (Ctrl+W)" Visibility="Hidden">
-                                        <TextBlock Text="&#xE711;" Style="{StaticResource Glyph}" FontSize="9" />
-                                    </Button>
-                                    <Image DockPanel.Dock="Left" Source="{Binding Icon}" Width="16" Height="16" Margin="0,0,8,0" RenderOptions.BitmapScalingMode="HighQuality" />
-                                    <TextBlock x:Name="TabText" Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
-                                               Foreground="{StaticResource SecondaryBrush}" />
-                                </DockPanel>
-                            </Border>
-                            <DataTemplate.Triggers>
-                                <Trigger SourceName="Tab" Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="Tab" Property="Background" Value="{StaticResource TabHoverBrush}" />
-                                    <Setter TargetName="TabClose" Property="Visibility" Value="Visible" />
-                                </Trigger>
-                                <DataTrigger Binding="{Binding IsActive}" Value="True">
-                                    <Setter TargetName="Tab" Property="Background" Value="{StaticResource CanvasBrush}" />
-                                    <Setter TargetName="TabClose" Property="Visibility" Value="Visible" />
-                                    <Setter TargetName="TabText" Property="Foreground" Value="{StaticResource InkBrush}" />
-                                </DataTrigger>
-                            </DataTemplate.Triggers>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <Button Style="{StaticResource TabMiniButton}" Width="30" Height="30" Margin="4,0,0,2" Click="NewTab_Click" ToolTip="새 탭 (Ctrl+T)">
-                    <TextBlock Text="&#xE710;" Style="{StaticResource Glyph}" FontSize="12" />
+            <!-- 탭 영역: 크롬처럼 넓게 시작해 자리가 모자라면 함께 좁아지고, 최소 폭에서는 좌우 화살표로 넘긴다 -->
+            <Grid Margin="6,0,8,0" VerticalAlignment="Bottom" MouseWheel="TabArea_MouseWheel">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Button x:Name="TabLeftBtn" Style="{StaticResource TabMiniButton}" Width="26" Height="30" Margin="0,0,2,2"
+                        Click="TabLeft_Click" ToolTip="앞쪽 탭 보기" Visibility="Collapsed">
+                    <TextBlock Text="&#xE76B;" Style="{StaticResource Glyph}" FontSize="10" />
                 </Button>
-            </StackPanel>
+                <Grid Grid.Column="1">
+                    <ItemsControl x:Name="TabItems" Focusable="False">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><local:TabStripPanel Loaded="TabPanel_Loaded" /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Border x:Name="Tab" Height="34" CornerRadius="8,8,0,0" Padding="12,0,6,0"
+                                            Background="Transparent" WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="{Binding Title}"
+                                            MouseLeftButtonDown="Tab_MouseDown" MouseUp="Tab_MouseUp" AllowDrop="True" DragOver="Tab_DragOver">
+                                        <DockPanel>
+                                            <Button x:Name="TabClose" DockPanel.Dock="Right" Style="{StaticResource TabMiniButton}" Margin="4,0,0,0"
+                                                    Click="TabClose_Click" ToolTip="탭 닫기 (Ctrl+W)" Visibility="Hidden">
+                                                <TextBlock Text="&#xE711;" Style="{StaticResource Glyph}" FontSize="9" />
+                                            </Button>
+                                            <Image DockPanel.Dock="Left" Source="{Binding Icon}" Width="16" Height="16" Margin="0,0,8,0" RenderOptions.BitmapScalingMode="HighQuality" />
+                                            <TextBlock x:Name="TabText" Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                                       Foreground="{StaticResource SecondaryBrush}" />
+                                        </DockPanel>
+                                    </Border>
+                                    <!-- 탭 사이 작은 구분선 -->
+                                    <Rectangle x:Name="Sep" Width="1" Height="18" Fill="#A7B9CF" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Margin="0,0,0,2" Visibility="Hidden" IsHitTestVisible="False" />
+                                </Grid>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding ShowSeparator}" Value="True">
+                                        <Setter TargetName="Sep" Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                    <Trigger SourceName="Tab" Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Tab" Property="Background" Value="{StaticResource TabHoverBrush}" />
+                                        <Setter TargetName="TabClose" Property="Visibility" Value="Visible" />
+                                        <Setter TargetName="Sep" Property="Visibility" Value="Hidden" />
+                                    </Trigger>
+                                    <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                        <Setter TargetName="Tab" Property="Background" Value="{StaticResource CanvasBrush}" />
+                                        <Setter TargetName="TabClose" Property="Visibility" Value="Visible" />
+                                        <Setter TargetName="TabText" Property="Foreground" Value="{StaticResource InkBrush}" />
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <!-- 새 탭: 마지막 탭 바로 옆 (위치는 코드에서) -->
+                    <Button x:Name="PlusBtn" Style="{StaticResource TabMiniButton}" Width="30" Height="30" Margin="4,0,0,2"
+                            HorizontalAlignment="Left" Click="NewTab_Click" ToolTip="새 탭 (Ctrl+T)">
+                        <TextBlock Text="&#xE710;" Style="{StaticResource Glyph}" FontSize="12" />
+                    </Button>
+                </Grid>
+                <Button x:Name="TabRightBtn" Grid.Column="2" Style="{StaticResource TabMiniButton}" Width="26" Height="30" Margin="2,0,0,2"
+                        Click="TabRight_Click" ToolTip="뒤쪽 탭 보기" Visibility="Collapsed">
+                    <TextBlock Text="&#xE76C;" Style="{StaticResource Glyph}" FontSize="10" />
+                </Button>
+            </Grid>
             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
                 <Button Style="{StaticResource CaptionButton}" Click="Min_Click" ToolTip="최소화">
                     <TextBlock Text="&#xE921;" Style="{StaticResource Glyph}" FontSize="10" />

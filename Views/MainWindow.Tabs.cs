@@ -25,6 +25,7 @@ public partial class MainWindow
         _tab = new TabState { IsActive = true };
         _tabs.Add(_tab);
         TabItems.ItemsSource = _tabs;
+        _tabs.CollectionChanged += (_, _) => AfterTabsChanged();
         StateChanged += (_, _) => ApplyWindowFrame();
         ApplyWindowFrame();
     }
@@ -87,6 +88,7 @@ public partial class MainWindow
         _tab = t;
         t.IsActive = true;
         RestoreTab(t);
+        AfterTabsChanged();
     }
 
     private void CommitOrCancelEdits() => CancelAllEdits();
@@ -103,6 +105,7 @@ public partial class MainWindow
         _tab = t;
         t.IsActive = true;
         RestoreTab(t);
+        AfterTabsChanged();
     }
 
     private void CloseTab(TabState t)
@@ -115,6 +118,52 @@ public partial class MainWindow
         _tab = next;
         next.IsActive = true;
         RestoreTab(next);
+        AfterTabsChanged();
+    }
+
+    // ----- 크롬식 탭 폭·화살표·구분선 -----
+
+    private TabStripPanel? _tabPanel;
+
+    private void TabPanel_Loaded(object sender, RoutedEventArgs e)
+    {
+        _tabPanel = (TabStripPanel)sender;
+        _tabPanel.LayoutUpdatedInfo += (_, _) => UpdateTabChrome();
+        UpdateTabChrome();
+    }
+
+    private void UpdateTabChrome()
+    {
+        if (_tabPanel == null) return;
+        var left = _tabPanel.UsedWidth + 4;
+        if (Math.Abs(PlusBtn.Margin.Left - left) > 0.5) PlusBtn.Margin = new Thickness(left, 0, 0, 2);
+        var arrows = _tabPanel.IsOverflowing ? Visibility.Visible : Visibility.Collapsed;
+        if (TabLeftBtn.Visibility != arrows) { TabLeftBtn.Visibility = arrows; TabRightBtn.Visibility = arrows; }
+        TabLeftBtn.IsEnabled = _tabPanel.CanScrollLeft;
+        TabRightBtn.IsEnabled = _tabPanel.CanScrollRight;
+    }
+
+    /// <summary>구분선은 지금 탭 양옆과 마지막 탭에서 숨기고, 지금 탭이 보이도록 밀어 둔다.</summary>
+    private void AfterTabsChanged()
+    {
+        for (int i = 0; i < _tabs.Count; i++)
+            _tabs[i].ShowSeparator = i < _tabs.Count - 1 && !_tabs[i].IsActive && !_tabs[i + 1].IsActive;
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+        {
+            _tabPanel?.EnsureVisible(_tabs.IndexOf(_tab));
+            UpdateTabChrome();
+        });
+    }
+
+    private void TabLeft_Click(object sender, RoutedEventArgs e) { _tabPanel?.ScrollBy(-1); UpdateTabChrome(); }
+    private void TabRight_Click(object sender, RoutedEventArgs e) { _tabPanel?.ScrollBy(1); UpdateTabChrome(); }
+
+    private void TabArea_MouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (_tabPanel is not { IsOverflowing: true }) return;
+        _tabPanel.ScrollBy(e.Delta > 0 ? -1 : 1);
+        UpdateTabChrome();
+        e.Handled = true;
     }
 
     private void CycleTab(int step)
