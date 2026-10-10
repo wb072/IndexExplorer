@@ -630,10 +630,23 @@ public partial class MainWindow
                 setw.Top = 0;
                 setw.Show();
                 await Settle(600);
-                setw.TestScrollTo("KindsCard");
+                TestShotWindow(setw, "25a_설정_일반");
+                setw.SelectTab("kinds");
                 await Settle(300);
                 TestShotWindow(setw, "25_설정_파일종류");
+                setw.SelectTab("engine");
+                await Settle(300);
+                TestShotWindow(setw, "25b_설정_엔진");
+                setw.SelectTab("about");
+                await Settle(300);
+                TestShotWindow(setw, "25c_설정_정보");
+                Check("설정: 탭 4개 (일반·파일 종류·색인 엔진·정보)", setw.TestVisiblePage() == "PageAbout", setw.TestVisiblePage());
                 setw.Close();
+                // 사이드바 우클릭: 종류 위에서는 편집·숨기기, 어디서나 새 종류·설정
+                var km = KindMenu(64).Items.OfType<MenuItem>().Select(m => m.Header as string).ToList();
+                var rm = KindMenu(null).Items.OfType<MenuItem>().Select(m => m.Header as string).ToList();
+                Check("파일 종류 우클릭: 편집·숨기기·새 종류·설정", km.SequenceEqual(["이름·확장자 편집…", "목록에서 숨기기", "새 파일 종류…", "파일 종류 설정…"]) && rm.Count == 2,
+                    string.Join(" / ", km));
                 var ed = new KindEditWindow(py.Clone(), _settings.Kinds, isNew: false)
                     { Owner = this, ShowActivated = false, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = SystemParameters.VirtualScreenLeft - 1000, Top = 0 };
                 ed.Show();

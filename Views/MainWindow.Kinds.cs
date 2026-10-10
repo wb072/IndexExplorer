@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using IndexExplorer.Engine;
@@ -175,6 +176,52 @@ public partial class MainWindow
         list.AddRange(_store.Files.Where(f => !f.Missing && FileKinds.Of(f.Name) == kind && !LocallyExcluded(f.Path)).Select(FileItem));
     }
 
+    /// <summary>사이드바 "파일 종류" 우클릭: 편집·숨기기 (종류 위에서), 새 종류, 설정.</summary>
+    private ContextMenu KindMenu(byte? kindId)
+    {
+        var menu = new ContextMenu();
+        void Add(string header, string glyph, Action act)
+        {
+            var mi = new MenuItem { Header = header, Icon = new TextBlock { Text = glyph, Style = (Style)FindResource("Glyph"), FontSize = 13, Foreground = (Brush)FindResource("AccentBrush") } };
+            mi.Click += (_, _) => act();
+            menu.Items.Add(mi);
+        }
+        if (kindId is { } id && _settings.Kinds.FirstOrDefault(k => k.Id == id) is { } ks)
+        {
+            Add("이름·확장자 편집…", "", () => EditKindSetting(ks, isNew: false));
+            Add("목록에서 숨기기", "", () => { ks.Enabled = false; ApplyKindSettings(); });
+            menu.Items.Add(new Separator());
+        }
+        Add("새 파일 종류…", "", () =>
+        {
+            var used = _settings.Kinds.Select(k => (int)k.Id).ToHashSet();
+            var nid = Enumerable.Range(FileKinds.FirstCustomId, 255 - FileKinds.FirstCustomId).FirstOrDefault(n => !used.Contains(n));
+            if (nid > 0) EditKindSetting(new KindSetting { Id = (byte)nid, Enabled = true }, isNew: true);
+        });
+        Add("파일 종류 설정…", "", () => OpenSettings("kinds"));
+        return menu;
+    }
+
+    /// <summary>사이드바에서 바로 종류 하나를 편집·추가하고 곧바로 적용.</summary>
+    private void EditKindSetting(KindSetting ks, bool isNew)
+    {
+        var copy = ks.Clone();
+        var w = new KindEditWindow(copy, _settings.Kinds, isNew) { Owner = this };
+        if (w.ShowDialog() != true) return;
+        if (w.Deleted) _settings.Kinds.RemoveAll(k => k.Id == ks.Id);
+        else if (isNew) _settings.Kinds.Add(copy);
+        else { ks.Name = copy.Name; ks.Exts = copy.Exts; }
+        ApplyKindSettings();
+        if (isNew && !w.Deleted) Navigate(new Location(LocKind.FileKind, copy.Id));
+    }
+
+    private void ApplyKindSettings()
+    {
+        _settings.Save();
+        FileKinds.SetCurrent(_settings.EnabledKinds());
+        foreach (var mw in Application.Current.Windows.OfType<MainWindow>()) mw.OnKindsChanged();
+    }
+
     /// <summary>설정에서 파일 종류가 바뀜: 사이드바를 다시 만들고, 지금 보는 종류가 꺼졌으면 "모든 파일"로.</summary>
     public void OnKindsChanged()
     {
@@ -229,6 +276,8 @@ public partial class MainWindow
         {
             Label("확장자");
             Value(string.Join(", ", k.Exts.Select(e => "." + e)));
+            if (_settings.Kinds.FirstOrDefault(s => s.Id == k.Id) is { } ks)
+                Buttons(ActionButton("이름·확장자 편집…", () => EditKindSetting(ks, isNew: false)));
         }
         Label("찾는 범위");
         if (EngineServes((byte)_loc.FolderId))
@@ -237,7 +286,7 @@ public partial class MainWindow
             if (EngineOutdated)
             {
                 Para("색인 엔진이 예전 버전이라 직접 바꾼 확장자가 PC 전체에는 아직 적용되지 않습니다. 설정에서 엔진을 업데이트하세요.");
-                Buttons(ActionButton("엔진 업데이트…", () => Settings_Click(this, new RoutedEventArgs()), primary: true));
+                Buttons(ActionButton("엔진 업데이트…", () => OpenSettings("engine"), primary: true));
             }
             var id = (byte)_loc.FolderId;
             var hidden = (_engineAllCounts?[id] ?? 0) - (_engineCounts?[id] ?? 0);
@@ -254,7 +303,7 @@ public partial class MainWindow
                 Para("윈도우·프로그램이 설치된 폴더(dll 이 있는 곳), 점(.)으로 시작하는 설정 폴더, AppData, 휴지통, 숨김 파일, 직접 뺀 폴더는 보이지 않습니다.");
                 var buttons = new List<System.Windows.Controls.Button>();
                 if (hidden > 0) buttons.Add(ActionButton("모두 보기", () => SetKindShowAll(true)));
-                if (_settings.KindExcludes.Count > 0) buttons.Add(ActionButton($"뺀 폴더 {_settings.KindExcludes.Count}개…", () => Settings_Click(this, new RoutedEventArgs())));
+                if (_settings.KindExcludes.Count > 0) buttons.Add(ActionButton($"뺀 폴더 {_settings.KindExcludes.Count}개…", () => OpenSettings("kinds")));
                 if (buttons.Count > 0) Buttons(buttons.ToArray());
             }
         }
@@ -263,13 +312,13 @@ public partial class MainWindow
             // 예전 엔진이 모르는 (새로 켠·만든) 종류
             Badge("색인한 폴더 안에서만", false);
             Para("이 종류를 PC 전체에서 찾으려면 색인 엔진을 새 버전으로 업데이트하세요. 관리자 승인이 한 번 필요합니다.");
-            Buttons(ActionButton("엔진 업데이트…", () => Settings_Click(this, new RoutedEventArgs()), primary: true));
+            Buttons(ActionButton("엔진 업데이트…", () => OpenSettings("engine"), primary: true));
         }
         else
         {
             Badge("색인한 폴더 안에서만", false);
             Para("PC 전체에서 찾으려면 색인 엔진을 설치하세요. 디스크 장부를 직접 읽어 모든 드라이브의 파일을 몇 초 만에 모읍니다.");
-            Buttons(ActionButton("색인 엔진 설치…", () => Settings_Click(this, new RoutedEventArgs()), primary: true));
+            Buttons(ActionButton("색인 엔진 설치…", () => OpenSettings("engine"), primary: true));
         }
         Para("정리하려면 파일을 왼쪽 색인 폴더로 끌어다 놓으세요. 원본은 그대로 있습니다.");
     }

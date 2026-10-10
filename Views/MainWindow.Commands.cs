@@ -989,6 +989,10 @@ public partial class MainWindow
                 menu.IsOpen = true;
                 break;
             }
+            case NodeKind.KindsRoot:
+            case NodeKind.FileKind:
+                KindMenu(node.Kind == NodeKind.FileKind ? (byte)node.FolderId : null).IsOpen = true;
+                break;
             case NodeKind.Dir:
                 ShellContextMenu.Show(this, [node.Path], [new("새 탭에서 열기", () => NewTab(new Location(LocKind.Dir, Path: node.Path))), new("새 창에서 열기", () => OpenNewWindow(new Location(LocKind.Dir, Path: node.Path)))], verb =>
                 {
@@ -1027,9 +1031,13 @@ public partial class MainWindow
         return null;
     }
 
-    private void Settings_Click(object sender, RoutedEventArgs e)
+    private void Settings_Click(object sender, RoutedEventArgs e) => OpenSettings();
+
+    /// <summary>설정 창 열기 (general · kinds · engine · about 탭).</summary>
+    private void OpenSettings(string tab = "general")
     {
         var w = new SettingsWindow(_settings, firstRun: false) { Owner = this };
+        w.SelectTab(tab);
         if (w.ShowDialog() == true)
         {
             _settings.Save();

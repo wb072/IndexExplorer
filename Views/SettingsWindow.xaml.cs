@@ -38,6 +38,7 @@ public partial class SettingsWindow : Window
 
     public SettingsWindow(Settings settings, bool firstRun)
     {
+        Resources["FolderIcon"] = Native.ShellImages.Icon(Path.GetTempPath(), true);
         InitializeComponent();
         _settings = settings;
         _roots = new ObservableCollection<string>(settings.WatchedRoots);
@@ -45,21 +46,60 @@ public partial class SettingsWindow : Window
         RootList.ItemsSource = _roots;
         _kindEx = new ObservableCollection<string>(settings.KindExcludes);
         KindExList.ItemsSource = _kindEx;
-        KindExCard.Visibility = _kindEx.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        _kindEx.CollectionChanged += (_, _) => UpdateKindExEmpty();
+        UpdateKindExEmpty();
         settings.NormalizeKinds();
         _kindsBefore = KindsSignature(settings.Kinds);
         _kinds = new ObservableCollection<KindRow>(settings.Kinds.Select(k => new KindRow(k.Clone())));
         KindList.ItemsSource = _kinds;
-        MaxHeight = SystemParameters.WorkArea.Height - 40;
-        StorageText.Text = _storage;
+        Height = Math.Min(Height, SystemParameters.WorkArea.Height - 40);
+        ShowStorage();
+        var ver = typeof(App).Assembly.GetName().Version;
+        var built = File.GetLastWriteTime(typeof(App).Assembly.Location);
+        VersionText.Text = $"버전 {ver?.Major}.{ver?.Minor} · {built:yyyy-MM-dd} 빌드";
+        DataText.Text = Settings.DataDir;
         UpdateEngineStatus();
         if (firstRun)
         {
             Title = "색인 탐색기 시작하기";
-            Heading.Text = "어떤 폴더의 파일을 정리할까요?";
+            Heading.Visibility = Visibility.Visible;
             SaveBtn.Content = "시작하기";
             CancelBtn.Content = "기본값으로 시작";
         }
+    }
+
+    /// <summary>탭 열기: general · kinds · engine · about.</summary>
+    public void SelectTab(string tab)
+    {
+        (tab switch { "kinds" => TabKinds, "engine" => TabEngine, "about" => TabAbout, _ => TabGeneral }).IsChecked = true;
+    }
+
+    private void Tab_Checked(object sender, RoutedEventArgs e)
+    {
+        if (PageGeneral == null) return; // 만드는 중
+        PageGeneral.Visibility = TabGeneral.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        PageKinds.Visibility = TabKinds.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        PageEngine.Visibility = TabEngine.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        PageAbout.Visibility = TabAbout.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void UpdateKindExEmpty() => KindExEmpty.Visibility = _kindEx.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    private void ShowStorage()
+    {
+        StorageName.Text = Path.GetFileName(Path.TrimEndingDirectorySeparator(_storage)) is { Length: > 0 } n ? n : _storage;
+        StorageText.Text = _storage;
+    }
+
+    private void OpenData_Click(object sender, RoutedEventArgs e)
+    {
+        try { Directory.CreateDirectory(Settings.DataDir); Process.Start(new ProcessStartInfo("explorer.exe", $"\"{Settings.DataDir}\"") { UseShellExecute = true }); }
+        catch { }
+    }
+
+    private void KindRow_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (e.ClickCount == 2 && sender is FrameworkElement { Tag: KindRow row }) { EditKind(row); e.Handled = true; }
     }
 
     private void UpdateEngineStatus()
@@ -73,13 +113,21 @@ public partial class SettingsWindow : Window
         EngineInstallBtn.Content = s == "설치 안 됨" ? "설치" : "다시 설치";
         EngineRemoveBtn.IsEnabled = s != "설치 안 됨";
         if (running) _ = CheckEngineVersion();
+        else DrivesSection.Visibility = Visibility.Collapsed;
     }
 
-    /// <summary>실행 중인 엔진이 예전 버전이면 (직접 정한 파일 종류를 모름) 업데이트를 권한다.</summary>
+    /// <summary>드라이브별 상태를 보여 주고, 실행 중인 엔진이 예전 버전이면 (직접 정한 파일 종류를 모름) 업데이트를 권한다.</summary>
     private async Task CheckEngineVersion()
     {
         var r = await App.Engine.AskAsync(new EngineProtocol.Request { Op = "status" }, 2000);
-        if (r is not { Ok: true } || r.Proto >= EngineProtocol.CurrentProto) return;
+        if (r is not { Ok: true }) return;
+        if (r.State is { Count: > 0 } st)
+        {
+            DriveList.ItemsSource = st.OrderBy(kv => kv.Key).ToList();
+            EngineFiles.Text = $"모든 드라이브 합계 파일 {r.Files:N0}개";
+            DrivesSection.Visibility = Visibility.Visible;
+        }
+        if (r.Proto >= EngineProtocol.CurrentProto) return;
         EngineStatus.Text = "업데이트 필요";
         EngineBadge.Background = (System.Windows.Media.Brush)FindResource("SidebarBrush");
         EngineStatus.Foreground = (System.Windows.Media.Brush)FindResource("SecondaryBrush");
@@ -87,14 +135,16 @@ public partial class SettingsWindow : Window
     }
 
     /// <summary>자체 검증: 이름 붙은 카드가 보이게 스크롤.</summary>
-    internal void TestScrollTo(string name)
-    {
-        if (FindName(name) is FrameworkElement fe) fe.BringIntoView();
-    }
+    internal string TestVisiblePage() =>
+        new FrameworkElement[] { PageGeneral, PageKinds, PageEngine, PageAbout }.Single(p => p.Visibility == Visibility.Visible).Name;
 
     private void EditKind_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not FrameworkElement { Tag: KindRow row }) return;
+        if (sender is FrameworkElement { Tag: KindRow row }) EditKind(row);
+    }
+
+    private void EditKind(KindRow row)
+    {
         var copy = row.S.Clone();
         var w = new KindEditWindow(copy, _kinds.Where(r => r != row).Select(r => r.S).ToList(), isNew: false) { Owner = this };
         if (w.ShowDialog() != true) return;
@@ -175,7 +225,7 @@ public partial class SettingsWindow : Window
         var dlg = new OpenFolderDialog { Title = "원본 보관함으로 쓸 폴더", InitialDirectory = Directory.Exists(_storage) ? _storage : "" };
         if (dlg.ShowDialog(this) != true) return;
         _storage = dlg.FolderName;
-        StorageText.Text = _storage;
+        ShowStorage();
     }
 
     private void Save_Click(object sender, RoutedEventArgs e)
