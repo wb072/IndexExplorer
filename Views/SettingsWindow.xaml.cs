@@ -53,6 +53,7 @@ public partial class SettingsWindow : Window
         _kinds = new ObservableCollection<KindRow>(settings.Kinds.Select(k => new KindRow(k.Clone())));
         KindList.ItemsSource = _kinds;
         Height = Math.Min(Height, SystemParameters.WorkArea.Height - 40);
+        Width = Math.Min(Width, SystemParameters.WorkArea.Width - 40);
         ShowStorage();
         var ver = typeof(App).Assembly.GetName().Version;
         var built = File.GetLastWriteTime(typeof(App).Assembly.Location);
