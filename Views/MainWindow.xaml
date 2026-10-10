@@ -8,6 +8,10 @@
         TextOptions.TextFormattingMode="Display"
         PreviewKeyDown="Window_PreviewKeyDown" PreviewMouseUp="Window_PreviewMouseUp">
 
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="40" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
+
     <Window.Resources>
         <Style TargetType="TreeViewItem" BasedOn="{StaticResource NavItem}" />
 
@@ -225,8 +229,66 @@
         </GridView>
     </Window.Resources>
 
-    <Grid>
-        <Grid.RowDefinitions>
+    <Border x:Name="RootFrame" BorderBrush="#C9D3E0" BorderThickness="1" Background="{StaticResource CanvasBrush}">
+    <DockPanel>
+        <!-- ===== 0행: 탭 줄 (제목 표시줄 겸용) ===== -->
+        <Grid DockPanel.Dock="Top" Height="40" Background="{StaticResource TabStripBrush}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Bottom">
+                <ItemsControl x:Name="TabItems" Focusable="False">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border x:Name="Tab" Height="34" MinWidth="130" MaxWidth="240" CornerRadius="8,8,0,0" Padding="12,0,6,0" Margin="0,0,2,0"
+                                    Background="Transparent" WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="{Binding Title}"
+                                    MouseLeftButtonDown="Tab_MouseDown" MouseUp="Tab_MouseUp" AllowDrop="True" DragOver="Tab_DragOver">
+                                <DockPanel>
+                                    <Button x:Name="TabClose" DockPanel.Dock="Right" Style="{StaticResource TabMiniButton}" Margin="6,0,0,0"
+                                            Click="TabClose_Click" ToolTip="탭 닫기 (Ctrl+W)" Visibility="Hidden">
+                                        <TextBlock Text="&#xE711;" Style="{StaticResource Glyph}" FontSize="9" />
+                                    </Button>
+                                    <Image DockPanel.Dock="Left" Source="{Binding Icon}" Width="16" Height="16" Margin="0,0,8,0" RenderOptions.BitmapScalingMode="HighQuality" />
+                                    <TextBlock x:Name="TabText" Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                               Foreground="{StaticResource SecondaryBrush}" />
+                                </DockPanel>
+                            </Border>
+                            <DataTemplate.Triggers>
+                                <Trigger SourceName="Tab" Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Tab" Property="Background" Value="{StaticResource TabHoverBrush}" />
+                                    <Setter TargetName="TabClose" Property="Visibility" Value="Visible" />
+                                </Trigger>
+                                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                    <Setter TargetName="Tab" Property="Background" Value="{StaticResource CanvasBrush}" />
+                                    <Setter TargetName="TabClose" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="TabText" Property="Foreground" Value="{StaticResource InkBrush}" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Style="{StaticResource TabMiniButton}" Width="30" Height="30" Margin="4,0,0,2" Click="NewTab_Click" ToolTip="새 탭 (Ctrl+T)">
+                    <TextBlock Text="&#xE710;" Style="{StaticResource Glyph}" FontSize="12" />
+                </Button>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                <Button Style="{StaticResource CaptionButton}" Click="Min_Click" ToolTip="최소화">
+                    <TextBlock Text="&#xE921;" Style="{StaticResource Glyph}" FontSize="10" />
+                </Button>
+                <Button x:Name="MaxBtn" Style="{StaticResource CaptionButton}" Click="Max_Click" ToolTip="최대화">
+                    <TextBlock x:Name="MaxGlyph" Text="&#xE922;" Style="{StaticResource Glyph}" FontSize="10" />
+                </Button>
+                <Button Style="{StaticResource CloseCaptionButton}" Click="CloseWin_Click" ToolTip="닫기">
+                    <TextBlock Text="&#xE8BB;" Style="{StaticResource Glyph}" FontSize="10" />
+                </Button>
+            </StackPanel>
+        </Grid>
+
+    <Grid>        <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -256,7 +318,7 @@
                     </Button>
                 </StackPanel>
 
-                <Border DockPanel.Dock="Right" Width="270" Height="32" CornerRadius="8" Background="{StaticResource FieldBrush}" Margin="8,0,0,0">
+                <Border DockPanel.Dock="Right" Width="270" Height="32" Style="{StaticResource FieldBorder}" Margin="8,0,0,0">
                     <Grid Margin="10,0,4,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
@@ -275,7 +337,7 @@
                     </Grid>
                 </Border>
 
-                <Border x:Name="CrumbBox" Height="32" CornerRadius="8" Background="{StaticResource FieldBrush}" Margin="8,0,0,0"
+                <Border x:Name="CrumbBox" Height="32" Style="{StaticResource FieldBorder}" Margin="8,0,0,0"
                         MouseLeftButtonDown="CrumbBox_MouseDown" Cursor="IBeam">
                     <Grid>
                         <ScrollViewer x:Name="CrumbScroll" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
@@ -472,4 +534,6 @@
             </DockPanel>
         </Border>
     </Grid>
+    </DockPanel>
+    </Border>
 </Window>

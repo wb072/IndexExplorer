@@ -347,6 +347,23 @@ public partial class MainWindow
             using (var mfs = File.Create(Path.Combine(App.SelfTestOut!, "15_메뉴강조.png"))) menc.Save(mfs);
             testMenu.IsOpen = false;
 
+            // 24) 탭: 탭마다 위치·기록을 따로 기억
+            Navigate(new Location(LocKind.IndexFolder, q.Id));
+            Navigate(new Location(LocKind.IndexFolder, m.Id));
+            var firstTab = _tab;
+            NewTab(new Location(LocKind.Dir, Path: P("Downloads")));
+            await Settle(500);
+            Check("새 탭 열기", _tabs.Count == 2 && _loc.Kind == LocKind.Dir && _tab.Title == "Downloads", $"{_tabs.Count}개, 제목 {_tab.Title}");
+            Shot("16_탭");
+            SwitchTo(firstTab);
+            await Settle(400);
+            Check("탭 전환 시 위치·뒤로 기록 복원", _loc.Kind == LocKind.IndexFolder && _loc.FolderId == m.Id && _back.Count > 0 && _back.Peek().FolderId == q.Id);
+            CycleTab(1);
+            Check("Ctrl+Tab 다음 탭", _loc.Kind == LocKind.Dir);
+            CloseTab(_tab);
+            await Settle(300);
+            Check("탭 닫기", _tabs.Count == 1 && _tab == firstTab && _loc.FolderId == m.Id);
+
             // 20) 창 두 개: 한 창에서 복사 → 다른 창의 색인 폴더에 붙여넣기 = 연결 (복사본 안 생김)
             var w2 = App.OpenWindow(new Location(LocKind.IndexFolder, r.Id), this);
             await Settle(900);

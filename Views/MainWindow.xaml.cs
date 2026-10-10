@@ -103,6 +103,7 @@ public partial class MainWindow : Window
         ApplyPreviewVisibility();
         UpdateSortHeaders();
 
+        InitTabs();
         IndexTree.ItemsSource = _indexNodes;
         PhysTree.ItemsSource = _physNodes;
         BuildIndexTree();
@@ -401,7 +402,8 @@ public partial class MainWindow : Window
             SetSearchText("");
         }
         // 최근 문서는 최근 사용 순이 기본, 나갈 때 원래 정렬로
-        if (loc.Kind == LocKind.Recent && _loc.Kind != LocKind.Recent) { _sortBeforeRecent = (_sortKey, _sortDesc); SetSort("Modified", true); }
+        if (_restoringTab) { }
+        else if (loc.Kind == LocKind.Recent && _loc.Kind != LocKind.Recent) { _sortBeforeRecent = (_sortKey, _sortDesc); SetSort("Modified", true); }
         else if (loc.Kind != LocKind.Recent && _loc.Kind == LocKind.Recent && _sortBeforeRecent is { } prev) { SetSort(prev.key, prev.desc); _sortBeforeRecent = null; }
         _loc = loc;
         if (loc.IsPhysical) { _lastPhysLoc = loc; SetMode(true); }
@@ -957,6 +959,7 @@ public partial class MainWindow : Window
         CrumbItems.ItemsSource = segs;
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => CrumbScroll.ScrollToRightEnd());
         Title = segs.Count > 0 ? $"{segs[^1].Text} - 색인 탐색기" : "색인 탐색기";
+        UpdateTabHeader(segs.Count > 0 ? segs[^1].Text : "색인");
     }
 
     private void Crumb_SegmentClick(object sender, RoutedEventArgs e)
@@ -1129,6 +1132,7 @@ public partial class MainWindow : Window
 
     private void Window_PreviewMouseUp(object sender, MouseButtonEventArgs e)
     {
+        if (e.ChangedButton == MouseButton.Middle && HandleMiddleClick(e)) { e.Handled = true; return; }
         if (e.ChangedButton == MouseButton.XButton1) { GoBack(); e.Handled = true; }
         else if (e.ChangedButton == MouseButton.XButton2) { GoForward(); e.Handled = true; }
     }
@@ -1143,6 +1147,10 @@ public partial class MainWindow : Window
         // 입력칸 안에서도 동작하는 단축키
         if ((ctrl && key is Key.F or Key.E) || (none && key == Key.F3)) { SearchBox.Focus(); SearchBox.SelectAll(); e.Handled = true; return; }
         if ((ctrl && key == Key.L) || (alt && key == Key.D)) { BeginAddressEdit(); e.Handled = true; return; }
+        // 탭
+        if (ctrl && key == Key.T) { NewTab(); e.Handled = true; return; }
+        if (ctrl && key == Key.W) { CloseTab(_tab); e.Handled = true; return; }
+        if (key == Key.Tab && (ctrl || ctrlShift)) { CycleTab(ctrlShift ? -1 : 1); e.Handled = true; return; }
         if (Keyboard.FocusedElement is TextBox) return;
 
         var inTree = IndexTree.IsKeyboardFocusWithin || PhysTree.IsKeyboardFocusWithin;
