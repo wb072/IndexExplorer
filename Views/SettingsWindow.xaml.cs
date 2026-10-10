@@ -125,8 +125,8 @@ public partial class SettingsWindow : Window
         {
             var drives = st.OrderBy(kv => kv.Key).ToList();
             DriveList.ItemsSource = drives.Select((kv, i) => new DriveRow(kv.Key, DriveName(kv.Key), FriendlyState(kv.Value), i < drives.Count - 1, kv.Value.Contains("이어 읽는 중") || kv.Value.Contains("읽음"),
-                Native.ShellImages.Icon(kv.Key + "\\", true, 32, perPath: true))).ToList();
-            EngineFiles.Text = $"모든 드라이브 합계 파일 {r.Files:N0}개";
+                Native.ShellImages.Icon(kv.Key + "\\", true, 16, perPath: true))).ToList();
+            EngineFiles.Text = $"모든 드라이브 합계 파일 {r.Files:N0}개를 따라가고 있습니다.";
             DrivesSection.Visibility = Visibility.Visible;
         }
         if (r.Proto >= EngineProtocol.CurrentProto) return;
