@@ -82,7 +82,7 @@ public partial class MainWindow
                 await Settle(800);
                 Check("실제 엔진: PC 전체 이미지", _engineUp && _items.Count > 0 && _items.Count == Math.Min(_engineCounts![7], KindQueryMax),
                     $"{_items.Count:N0}개 (엔진 {_engineCounts?[7]:N0}), 배지 {KindNode(7)?.Badge}");
-                SelectNamed(_items.FirstOrDefault()?.Name ?? "");
+                List.SelectedItems.Clear();
                 await Settle(600);
                 Shot("21_엔진_이미지");
                 return;
@@ -458,6 +458,64 @@ public partial class MainWindow
                 var vi2 = new IndexExplorer.Engine.VolumeIndex("X:");
                 Check("엔진: 목록 저장·복원 (재부팅 후 이어 읽기용)", vi2.Load(snapPath) && vi2.Count == 5 && vi2.JournalId == 0xABC && vi2.NextUsn == 12345
                     && vi2.PathOf(f1) == @"X:\업무\견적\견적서_최종.xlsx");
+                // 잡동사니 거르기: 점(.) 폴더, dll 이 3개 이상인 프로그램 폴더, 직접 뺀 폴더, 모두 보기
+                var jv = new IndexExplorer.Engine.VolumeIndex("Z:");
+                jv.Write(v =>
+                {
+                    v.Upsert(20, 5, "사용자", Dir);
+                    v.Upsert(21, 20, ".eclipse", Dir);
+                    v.Upsert(22, 21, "아이콘.png", 0x20);            // 점 폴더 → 숨김
+                    v.Upsert(30, 5, "게임", Dir);
+                    v.Upsert(31, 30, "client", Dir);
+                    for (ulong i = 0; i < 3; i++) v.Upsert(40 + i, 31, $"lib{i}.dll", 0x20);
+                    v.Upsert(32, 31, "cache", Dir);
+                    v.Upsert(33, 32, "배경.jpg", 0x20);              // 프로그램 폴더 아래 → 숨김
+                    v.Upsert(50, 20, "다운로드", Dir);
+                    v.Upsert(51, 50, "setup.exe", 0x20);             // exe 하나로는 프로그램 폴더 아님
+                    v.Upsert(52, 50, "사진.png", 0x20);              // 보임
+                    v.Upsert(60, 20, "옛날자료", Dir);
+                    v.Upsert(61, 60, "스캔.png", 0x20);              // 직접 빼면 숨김
+                });
+                var ex = new List<string> { @"Z:\사용자\옛날자료" };
+                var jc = jv.CountByKind(false, ex);
+                var jAll = jv.CountByKind(true);
+                Check("잡동사니: 점 폴더·프로그램 폴더·직접 뺀 폴더 숨김", jc[7] == 1 && jAll[7] == 4 && jv.Query(7, null, false, 10, ex).Single().Path == @"Z:\사용자\다운로드\사진.png",
+                    $"보이는 이미지 {jc[7]} / 전체 {jAll[7]}");
+                Check("잡동사니: 직접 뺀 폴더를 빼면 다시 보임", jv.CountByKind(false)[7] == 2);
+                jv.Write(v => { v.Remove(41); v.Remove(42); });
+                Check("잡동사니: dll 이 줄면 프로그램 폴더 판별도 풀림", jv.CountByKind(false)[7] == 3);
+
+                // 프로그램 폴더 꼭대기: dll 폴더에서 두 단계 위까지 (드라이브 바로 아래·사용자 폴더는 제외)
+                var pv = new IndexExplorer.Engine.VolumeIndex("W:");
+                pv.Write(v =>
+                {
+                    v.Upsert(70, 5, "개발", Dir);                     // 드라이브 바로 아래 → 절대 숨기지 않음
+                    v.Upsert(71, 70, "Git", Dir);
+                    v.Upsert(72, 71, "ucrt64", Dir);
+                    v.Upsert(73, 72, "bin", Dir);
+                    for (ulong i = 0; i < 3; i++) v.Upsert(80 + i, 73, $"m{i}.dll", 0x20);
+                    v.Upsert(74, 72, "lib", Dir);
+                    v.Upsert(75, 74, "그림.png", 0x20);                // Git 안 → 숨김
+                    v.Upsert(76, 70, "내프로젝트", Dir);
+                    v.Upsert(77, 76, "화면.png", 0x20);                // 개발\내프로젝트 → 보임
+                });
+                pv.Write(v =>
+                {
+                    v.Upsert(90, 5, "VoiceAI", Dir);                   // 드라이브 바로 아래 → 지킴
+                    v.Upsert(91, 90, "GPT-SoVITS", Dir);               // 프로그램 꼭대기 → 숨김
+                    v.Upsert(92, 91, "runtime", Dir);
+                    for (ulong i = 0; i < 3; i++) v.Upsert(95 + i, 92, $"py{i}.dll", 0x20);
+                    v.Upsert(93, 91, "fig", Dir);
+                    v.Upsert(94, 93, "구조.png", 0x20);
+                    v.Upsert(98, 90, "내목소리.png", 0x20);            // VoiceAI 바로 안 → 보임
+                });
+                var pc = pv.Query(7, null, false, 10).Where(h => !h.Path.Contains("VoiceAI")).ToList();
+                var pcVoice = pv.Query(7, null, false, 10).Where(h => h.Path.Contains("VoiceAI")).Select(h => h.Path).ToList();
+                Check("잡동사니: 드라이브 바로 아래 폴더 안의 프로그램(GPT-SoVITS)은 숨기고 그 폴더는 지킴",
+                    pcVoice.Count == 1 && pcVoice[0] == @"W:\VoiceAI\내목소리.png", string.Join(", ", pcVoice));
+                Check("잡동사니: 프로그램 꼭대기까지 숨기되 드라이브 바로 아래 폴더는 지킴",
+                    pc.Count == 1 && pc[0].Path == @"W:\개발\내프로젝트\화면.png", string.Join(", ", pc.Select(h => h.Path)));
+
                 // 대량: 50만 개 넣고 조회 속도
                 var big = new IndexExplorer.Engine.VolumeIndex("Y:");
                 var swE = Stopwatch.StartNew();

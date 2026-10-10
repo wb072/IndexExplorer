@@ -19,6 +19,9 @@ public sealed class Settings
     public string StorageRoot { get; set; } = "";
 
     public bool FirstRunDone { get; set; }
+
+    /// <summary>파일 종류 보기에서 직접 뺀 폴더 (그 아래 전체가 안 보인다).</summary>
+    public List<string> KindExcludes { get; set; } = [];
     public bool IconView { get; set; }
     public bool PreviewPane { get; set; } = true;
     public double Left { get; set; } = double.NaN;

@@ -814,6 +814,8 @@ public partial class MainWindow
             extras.Add(new("색인에 추가…", () => BuildFolderPicker(id => LinkItems(id, files)).IsOpen = true));
         if (sel.Any(i => i.Kind == ItemKind.File))
             extras.Add(new("메모장으로 열기", () => OpenInNotepad(sel)));
+        if (_loc.Kind == LocKind.FileKind && files.Count > 0)
+            extras.Add(new("이 폴더를 파일 종류에서 빼기", () => ExcludeFoldersFromKinds(files.Select(i => PathUtil.Dir(i.Path)))));
         if (sel.Count == 1 && sel[0].Kind is ItemKind.Dir or ItemKind.Drive)
         {
             extras.Insert(0, new("새 창에서 열기", () => OpenNewWindow(new Location(LocKind.Dir, Path: sel[0].Path))));

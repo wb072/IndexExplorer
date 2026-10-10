@@ -74,8 +74,11 @@ public sealed class EnginePipeServer : IDisposable
             switch (req.Op)
             {
                 case "status": resp.State = _host.State.ToDictionary(kv => kv.Key, kv => kv.Value); break;
-                case "counts": resp.Counts = _host.Counts(req.IncludeSystem); break;
-                case "query": resp.Items = _host.Query(req.Kind, req.Text, req.IncludeSystem, Math.Clamp(req.Max, 1, 200_000)); break;
+                case "counts":
+                    resp.Counts = _host.Counts(req.IncludeSystem, req.Excludes);
+                    resp.AllCounts = _host.Counts(includeSystem: true);
+                    break;
+                case "query": resp.Items = _host.Query(req.Kind, req.Text, req.IncludeSystem, Math.Clamp(req.Max, 1, 200_000), req.Excludes); break;
                 default: return new EngineProtocol.Response { Ok = false, Error = "알 수 없는 요청" };
             }
             return resp;

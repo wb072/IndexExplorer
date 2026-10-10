@@ -56,6 +56,14 @@ public static class Program
         sw.Restart();
         var q = c.AskAsync(new EngineProtocol.Request { Op = "query", Kind = 7, Max = 20000 }, 30000).GetAwaiter().GetResult();
         log.Add($"이미지 조회: {q?.Items?.Count:N0}개 {sw.ElapsedMilliseconds}ms");
+        if (cn?.AllCounts != null && cn.Counts != null)
+            log.Add($"숨긴 잡동사니: 이미지 {cn.AllCounts[7] - cn.Counts[7]:N0}개 (전체 {cn.AllCounts[7]:N0})");
+        if (q?.Items != null)
+        {
+            log.Add("이미지 폴더별 (많은 순 15):");
+            foreach (var g in q.Items.GroupBy(i => Path.GetDirectoryName(i.Path)).OrderByDescending(g => g.Count()).Take(15))
+                log.Add($"  {g.Count(),6:N0}  {g.Key}");
+        }
         File.WriteAllLines(outPath, log);
         return st?.Ok == true ? 0 : 1;
     }

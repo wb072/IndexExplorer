@@ -422,8 +422,8 @@ public partial class MainWindow : Window
         }
         // 최근 문서는 최근 사용 순이 기본, 나갈 때 원래 정렬로
         if (_restoringTab) { }
-        else if (loc.Kind == LocKind.Recent && _loc.Kind != LocKind.Recent) { _sortBeforeRecent = (_sortKey, _sortDesc); SetSort("Modified", true); }
-        else if (loc.Kind != LocKind.Recent && _loc.Kind == LocKind.Recent && _sortBeforeRecent is { } prev) { SetSort(prev.key, prev.desc); _sortBeforeRecent = null; }
+        else if (IsRecentSorted(loc.Kind) && !IsRecentSorted(_loc.Kind)) { _sortBeforeRecent = (_sortKey, _sortDesc); SetSort("Modified", true); }
+        else if (!IsRecentSorted(loc.Kind) && IsRecentSorted(_loc.Kind) && _sortBeforeRecent is { } prev) { SetSort(prev.key, prev.desc); _sortBeforeRecent = null; }
         _loc = loc;
         if (loc.IsPhysical) { _lastPhysLoc = loc; SetMode(true); }
         else if (loc.Kind != LocKind.Search) { _lastIndexLoc = loc; SetMode(false); }
@@ -438,6 +438,9 @@ public partial class MainWindow : Window
     }
 
     private (string key, bool desc)? _sortBeforeRecent;
+
+    /// <summary>최근 문서·파일 종류는 최근 순이 기본 (흩어진 파일 중 요즘 것부터).</summary>
+    private static bool IsRecentSorted(LocKind k) => k is LocKind.Recent or LocKind.FileKind;
 
     /// <summary>색인/원본 스위치의 흰 알약을 부드럽게 옮긴다.</summary>
     private void MoveModeThumb(bool physical, bool animate = true)

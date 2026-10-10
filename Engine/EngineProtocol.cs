@@ -17,6 +17,8 @@ public static class EngineProtocol
         public string? Text { get; set; }
         public bool IncludeSystem { get; set; }
         public int Max { get; set; } = 20000;
+        /// <summary>사용자가 직접 뺀 폴더.</summary>
+        public List<string>? Excludes { get; set; }
     }
 
     public sealed class Response
@@ -26,6 +28,8 @@ public static class EngineProtocol
         public long Version { get; set; }
         public long Files { get; set; }
         public int[]? Counts { get; set; }
+        /// <summary>모두 보기 기준 개수 (숨긴 항목 수 = AllCounts - Counts).</summary>
+        public int[]? AllCounts { get; set; }
         public List<EngineHost.Item>? Items { get; set; }
         public Dictionary<string, string>? State { get; set; }
     }

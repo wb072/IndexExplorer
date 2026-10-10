@@ -74,6 +74,31 @@
             </StackPanel>
         </Border>
 
+        <!-- 파일 종류에서 뺀 폴더 -->
+        <Border x:Name="KindExCard" Margin="0,14,0,0" Background="White" CornerRadius="12" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1" Padding="18,16">
+            <StackPanel>
+                <TextBlock Text="파일 종류에서 뺀 폴더" FontSize="15" FontWeight="SemiBold" />
+                <TextBlock x:Name="KindExHint" Margin="0,4,0,6" TextWrapping="Wrap" FontSize="12.5" Foreground="{StaticResource SecondaryBrush}"
+                           Text="파일 종류 보기에서 우클릭 › &quot;이 폴더를 파일 종류에서 빼기&quot;로 뺀 폴더입니다. ×를 누르면 다시 보입니다. 파일은 영향이 없습니다." />
+                <ItemsControl x:Name="KindExList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1" Padding="0,6">
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Style="{StaticResource ToolButtonB}" Height="26" MinWidth="26" Padding="5,0"
+                                            ToolTip="다시 보이게" Click="RemoveKindEx_Click" Tag="{Binding}">
+                                        <TextBlock Text="&#xE711;" Style="{StaticResource Glyph}" FontSize="10" Foreground="{StaticResource SecondaryBrush}" />
+                                    </Button>
+                                    <TextBlock Text="&#xE8B7;" Style="{StaticResource Glyph}" Foreground="#9AA3AF" Margin="0,0,10,0" />
+                                    <TextBlock Text="{Binding}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding}" />
+                                </DockPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
         <DockPanel Margin="0,22,0,0" LastChildFill="False">
             <Button x:Name="SaveBtn" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="저장" Padding="20,8" IsDefault="True" Click="Save_Click" />
             <Button x:Name="CancelBtn" DockPanel.Dock="Right" Style="{StaticResource PearlButton}" Content="취소" Padding="18,8" Margin="0,0,10,0" IsCancel="True" />

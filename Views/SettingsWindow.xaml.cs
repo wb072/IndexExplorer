@@ -13,6 +13,7 @@ public partial class SettingsWindow : Window
 {
     private readonly Settings _settings;
     private readonly ObservableCollection<string> _roots;
+    private readonly ObservableCollection<string> _kindEx;
     private string _storage;
 
     public SettingsWindow(Settings settings, bool firstRun)
@@ -22,6 +23,9 @@ public partial class SettingsWindow : Window
         _roots = new ObservableCollection<string>(settings.WatchedRoots);
         _storage = settings.StorageRoot;
         RootList.ItemsSource = _roots;
+        _kindEx = new ObservableCollection<string>(settings.KindExcludes);
+        KindExList.ItemsSource = _kindEx;
+        KindExCard.Visibility = _kindEx.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         StorageText.Text = _storage;
         UpdateEngineStatus();
         if (firstRun)
@@ -92,6 +96,11 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private void RemoveKindEx_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string p }) _kindEx.Remove(p);
+    }
+
     private void RemoveRoot_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { Tag: string p }) _roots.Remove(p);
@@ -109,6 +118,7 @@ public partial class SettingsWindow : Window
     {
         _settings.WatchedRoots = _roots.ToList();
         _settings.StorageRoot = _storage;
+        _settings.KindExcludes = _kindEx.ToList();
         DialogResult = true;
     }
 }

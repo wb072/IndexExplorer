@@ -35,6 +35,74 @@ public sealed class VolumeIndex
     private long _version;
     private readonly ReaderWriterLockSlim _lock = new(LockRecursionPolicy.NoRecursion);
     private readonly Dictionary<int, bool> _systemDir = [];   // 폴더 칸 → 시스템 폴더 아래인가 (캐시)
+    /// <summary>폴더(파일 번호)별 바로 안의 시스템 파일(dll 등) 수 — 프로그램이 설치된 폴더를 알아보는 데 쓴다.</summary>
+    private readonly Dictionary<ulong, int> _sysFilesIn = [];
+    private const byte SystemKind = 12;
+    public const int ProgramFolderThreshold = 3;
+
+    private long _dirStamp;                    // 폴더 구조·프로그램 폴더 판별이 바뀔 때마다 늘어난다
+    private HashSet<int>? _programRoots;
+    private long _programRootsStamp = -1;
+
+    private void InvalidateDirs()
+    {
+        lock (_systemDir)
+        {
+            _systemDir.Clear();
+            _dirStamp++;
+        }
+    }
+
+    private static readonly HashSet<string> UserPlaces = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Users", "사용자", "Desktop", "바탕 화면", "Documents", "문서", "Downloads", "다운로드", "Pictures", "사진",
+        "Videos", "동영상", "Music", "음악", "OneDrive", "Public", "공용",
+    };
+
+    /// <summary>
+    /// 프로그램이 설치된 폴더의 "꼭대기": dll 이 3개 이상인 폴더에서 두 단계 위까지.
+    /// (Git\ucrt64\bin 의 dll → Git 전체, 게임\Mad\Binaries\Win64 → Mad 전체)
+    /// 드라이브 바로 아래 폴더와 사용자 폴더(바탕 화면·문서·다운로드 …)는 절대 넣지 않는다.
+    /// </summary>
+    private HashSet<int> ProgramRoots()
+    {
+        long stamp;
+        lock (_systemDir)
+        {
+            if (_programRoots != null && _programRootsStamp == _dirStamp) return _programRoots;
+            stamp = _dirStamp;
+        }
+        var set = new HashSet<int>();
+        foreach (var (dirFrn, n) in _sysFilesIn)
+        {
+            if (n < ProgramFolderThreshold || !_slotOf.TryGetValue(dirFrn, out var d)) continue;
+            var cur = d;
+            for (int up = 0; up <= 2 && cur >= 0; up++)
+            {
+                var parent = _slotOf.TryGetValue(_parent[cur], out var p) && p != cur ? p : -1;
+                var isTop = parent < 0; // 이 폴더가 드라이브 바로 아래 (D:\개발, D:\게임 …) → 지킨다
+                var name = _pool.AsSpan(_nameOff[cur], _nameLen[cur]).ToString();
+                if (isTop || UserPlaces.Contains(name) || (parent >= 0 && UserPlaces.Contains(_pool.AsSpan(_nameOff[parent], _nameLen[parent]).ToString()) && up > 0))
+                    break;
+                set.Add(cur);
+                cur = parent;
+            }
+        }
+        lock (_systemDir)
+        {
+            if (_dirStamp == stamp) { _programRoots = set; _programRootsStamp = stamp; }
+        }
+        return set;
+    }
+
+    private void CountSys(ulong parent, int delta)
+    {
+        var before = _sysFilesIn.GetValueOrDefault(parent);
+        var after = before + delta;
+        if (after <= 0) _sysFilesIn.Remove(parent); else _sysFilesIn[parent] = after;
+        // 프로그램 폴더 기준을 넘나들면 판별 캐시를 버린다
+        if ((before >= ProgramFolderThreshold) != (after >= ProgramFolderThreshold)) InvalidateDirs();
+    }
 
     public VolumeIndex(string root) { Root = root.TrimEnd('\\'); }
 
@@ -64,10 +132,14 @@ public sealed class VolumeIndex
             var wasDir = (_attr[s] & AttrDirectory) != 0;
             var sameName = name.SequenceEqual(_pool.AsSpan(_nameOff[s], _nameLen[s]));
             if (!sameName) SetName(s, name);
-            if (wasDir && (_parent[s] != parent || !sameName)) _systemDir.Clear(); // 폴더가 옮겨지거나 이름이 바뀌면 판별 캐시를 버린다
+            if (wasDir && (_parent[s] != parent || !sameName)) InvalidateDirs(); // 폴더가 옮겨지거나 이름이 바뀌면 판별 캐시를 버린다
+            var oldKind = _kind[s];
+            var oldParent = _parent[s];
             _parent[s] = parent;
             _attr[s] = attr;
             _kind[s] = (attr & AttrDirectory) != 0 ? FileKinds.None : FileKinds.Of(name);
+            if (oldKind == SystemKind && (_kind[s] != SystemKind || oldParent != parent)) CountSys(oldParent, -1);
+            if (_kind[s] == SystemKind && (oldKind != SystemKind || oldParent != parent)) CountSys(parent, +1);
             return;
         }
         s = _free.Count > 0 ? _free.Pop() : _slots++;
@@ -79,12 +151,14 @@ public sealed class VolumeIndex
         _nameLen[s] = 0;
         SetName(s, name);
         _slotOf[frn] = s;
+        if (_kind[s] == SystemKind) CountSys(parent, +1);
     }
 
     public void Remove(ulong frn)
     {
         if (!_slotOf.Remove(frn, out var s)) return;
-        if ((_attr[s] & AttrDirectory) != 0) _systemDir.Clear();
+        if ((_attr[s] & AttrDirectory) != 0) InvalidateDirs();
+        if (_kind[s] == SystemKind) CountSys(_parent[s], -1);
         _poolGarbage += _nameLen[s];
         _frn[s] = 0;
         _nameLen[s] = 0;
@@ -96,7 +170,8 @@ public sealed class VolumeIndex
     {
         _slotOf.Clear();
         _free.Clear();
-        _systemDir.Clear();
+        InvalidateDirs();
+        _sysFilesIn.Clear();
         _slots = 0;
         _poolUsed = 0;
         _poolGarbage = 0;
@@ -180,27 +255,75 @@ public sealed class VolumeIndex
         var name = _pool.AsSpan(_nameOff[d], _nameLen[d]).ToString();
         var parent = depth < 128 && _slotOf.TryGetValue(_parent[d], out var ps) && ps != d ? ps : -1;
         if (SystemAnywhere.Contains(name)) result = true;
+        else if (name.Length > 1 && name[0] == '.') result = true;                               // .eclipse, .vscode, .cache … 프로그램 설정 폴더
+        else if (_sysFilesIn.GetValueOrDefault(_frn[d]) >= ProgramFolderThreshold) result = true; // dll 이 여럿 = 프로그램이 설치된 폴더
+        else if (ProgramRoots().Contains(d)) result = true;                                       // 그 두 단계 위까지 (프로그램의 꼭대기)
         else if (parent < 0) result = SystemTop.Contains(name);          // 드라이브 바로 아래 폴더
         else result = DirIsSystem(parent, depth + 1);
         lock (_systemDir) _systemDir[d] = result;
         return result;
     }
 
-    private bool Visible(int s, bool includeSystem) =>
-        includeSystem || ((_attr[s] & (AttrHidden | AttrSystem)) == 0 && !UnderSystem(s));
+    /// <summary>사용자가 직접 뺀 폴더 (요청마다): 폴더 칸 집합 + 판별 기억.</summary>
+    private sealed class Excludes
+    {
+        public readonly HashSet<int> Dirs = [];
+        public readonly Dictionary<int, bool> Memo = [];
+    }
+
+    /// <summary>뺀 폴더 경로를 이 드라이브의 폴더 칸으로 바꾼다 (읽기 잠금 안에서). 이름이 같은 폴더만 경로를 맞춰 본다.</summary>
+    private Excludes? ResolveExcludes(IReadOnlyCollection<string>? paths)
+    {
+        if (paths == null || paths.Count == 0) return null;
+        var want = paths.Select(p => Path.TrimEndingDirectorySeparator(p))
+            .Where(p => p.StartsWith(Root + "\\", StringComparison.OrdinalIgnoreCase))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (want.Count == 0) return null;
+        var names = want.Select(Path.GetFileName).OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var ex = new Excludes();
+        foreach (var s in _slotOf.Values)
+        {
+            if ((_attr[s] & AttrDirectory) == 0) continue;
+            if (!names.Contains(_pool.AsSpan(_nameOff[s], _nameLen[s]).ToString())) continue;
+            if (want.Contains(PathOfUnlocked(s))) ex.Dirs.Add(s);
+        }
+        return ex.Dirs.Count > 0 ? ex : null;
+    }
+
+    private bool InExcluded(int s, Excludes ex)
+    {
+        var cur = _slotOf.TryGetValue(_parent[s], out var p) && p != s ? p : -1;
+        Span<int> path = stackalloc int[128];
+        int n = 0;
+        bool result = false;
+        while (cur >= 0 && n < path.Length)
+        {
+            if (ex.Memo.TryGetValue(cur, out var known)) { result = known; break; }
+            if (ex.Dirs.Contains(cur)) { result = true; path[n++] = cur; break; }
+            path[n++] = cur;
+            cur = _slotOf.TryGetValue(_parent[cur], out var pp) && pp != cur ? pp : -1;
+        }
+        for (int i = 0; i < n; i++) ex.Memo[path[i]] = result;
+        return result;
+    }
+
+    /// <summary>includeSystem = 모두 보기 (자동으로 숨긴 것·직접 뺀 폴더 모두 보임).</summary>
+    private bool Visible(int s, bool includeSystem, Excludes? ex) =>
+        includeSystem || ((_attr[s] & (AttrHidden | AttrSystem)) == 0 && !UnderSystem(s) && (ex == null || !InExcluded(s, ex)));
 
     /// <summary>종류별 파일 수.</summary>
-    public int[] CountByKind(bool includeSystem)
+    public int[] CountByKind(bool includeSystem, IReadOnlyCollection<string>? excludes = null)
     {
         var counts = new int[FileKinds.All.Length + 1];
         _lock.EnterReadLock();
         try
         {
+            var ex = includeSystem ? null : ResolveExcludes(excludes);
             foreach (var s in _slotOf.Values)
             {
                 var k = _kind[s];
                 if (k == FileKinds.None || (_attr[s] & AttrDirectory) != 0) continue;
-                if (Visible(s, includeSystem)) counts[k]++;
+                if (Visible(s, includeSystem, ex)) counts[k]++;
             }
         }
         finally { _lock.ExitReadLock(); }
@@ -210,13 +333,14 @@ public sealed class VolumeIndex
     public sealed record Hit(ulong Frn, string Path, uint Attr);
 
     /// <summary>종류(0이면 전체)와 이름 검색어(공백으로 나눈 단어 모두 포함)로 파일 찾기.</summary>
-    public List<Hit> Query(byte kind, string? text, bool includeSystem, int max)
+    public List<Hit> Query(byte kind, string? text, bool includeSystem, int max, IReadOnlyCollection<string>? excludes = null)
     {
         var words = (text ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var hits = new List<Hit>();
         _lock.EnterReadLock();
         try
         {
+            var ex = includeSystem ? null : ResolveExcludes(excludes);
             foreach (var s in _slotOf.Values)
             {
                 if ((_attr[s] & AttrDirectory) != 0) continue;
@@ -228,7 +352,7 @@ public sealed class VolumeIndex
                     foreach (var w in words) if (name.IndexOf(w, StringComparison.OrdinalIgnoreCase) < 0) { ok = false; break; }
                     if (!ok) continue;
                 }
-                if (!Visible(s, includeSystem)) continue;
+                if (!Visible(s, includeSystem, ex)) continue;
                 hits.Add(new Hit(_frn[s], PathOfUnlocked(s), _attr[s]));
                 if (hits.Count >= max) break;
             }
