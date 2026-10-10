@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -30,6 +30,8 @@ public partial class MainWindow
 
     private (byte kind, int count, List<EngineHost.Item> items)? _kindResult;
     private bool _kindLoading;
+    /// <summary>마지막 엔진 조회가 실패함 (다시 그릴 때 또 묻지 않는다. F5·다른 종류로 가면 다시 묻는다).</summary>
+    private byte? _kindFailed;
 
     public const int KindQueryMax = 20000;
 
@@ -113,6 +115,7 @@ public partial class MainWindow
         if (!_engineUp || _kindLoading) return;
         var kind = (byte)_loc.FolderId;
         if (!force && _kindResult is { } cur && cur.kind == kind) return;
+        if (!force && _kindFailed == kind) return;
         _kindLoading = true;
         try
         {
@@ -120,9 +123,18 @@ public partial class MainWindow
             {
                 Op = "query", Kind = kind, Max = KindQueryMax, IncludeSystem = _kindShowAll, Excludes = _settings.KindExcludes,
             }, 30000);
-            if (resp is not { Ok: true, Items: not null }) return;
+            if (resp is not { Ok: true, Items: not null })
+            {
+                // 실패해도 "찾는 중"에 멈춰 있지 않게: 알리고 화면을 다시 그린다 (F5로 다시 시도)
+                _kindFailed = kind;
+                _kindLoading = false;
+                if (_loc.Kind == LocKind.FileKind && (byte)_loc.FolderId == kind) LoadItems(reset: false);
+                return;
+            }
+            _kindFailed = null;
             var count = CurrentKindCount(kind);
             _kindResult = (kind, count, resp.Items);
+            _kindLoading = false;
             if (_loc.Kind == LocKind.FileKind && (byte)_loc.FolderId == kind) LoadItems(reset: false);
         }
         finally { _kindLoading = false; }

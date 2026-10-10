@@ -790,7 +790,9 @@ public partial class MainWindow : Window
             LocKind.Search => ("검색 결과가 없습니다", "다른 단어로 찾아보세요. 띄어 쓴 단어는 모두 포함된 파일을 찾습니다."),
             LocKind.AllFiles => ("색인된 파일이 없습니다", "설정에서 색인할 폴더를 추가하세요."),
             LocKind.Duplicates => _dupRunning ? ("중복 파일을 찾는 중…", _dupStatus) : ("중복 파일이 없습니다", "내용이 같은 파일이 두 곳 이상에 있으면 여기에 모입니다."),
-            LocKind.FileKind => _engineUp ? (_kindLoading ? ("PC 전체에서 찾는 중…", "") : ("이 종류의 파일이 없습니다", ""))
+            LocKind.FileKind => _engineUp ? (_kindLoading ? ("PC 전체에서 찾는 중…", "")
+                    : _kindFailed == (byte)_loc.FolderId ? ("색인 엔진이 답하지 않습니다", "F5를 누르면 다시 찾습니다.")
+                    : ("이 종류의 파일이 없습니다", ""))
                 : ("색인한 폴더에 이 종류의 파일이 없습니다", "PC 전체에서 찾으려면 설정에서 색인 엔진을 설치하세요."),
             _ => ("이 폴더는 비어 있습니다", ""),
         };
