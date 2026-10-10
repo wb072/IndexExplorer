@@ -47,6 +47,7 @@ public partial class MainWindow
         t.Filters = _filters.ToDictionary(kv => kv.Key, kv => kv.Value.ToHashSet());
         t.SelectedKeys = Selected().Select(i => i.Key).ToList();
         t.ScrollOffset = FindDescendant<ScrollViewer>(List)?.VerticalOffset ?? 0;
+        t.GroupBy = _groupBy;
     }
 
     private void RestoreTab(TabState t)
@@ -62,6 +63,7 @@ public partial class MainWindow
         _sortBeforeRecent = t.SortBeforeRecent;
 
         _restoringTab = true;
+        _groupBy = t.GroupBy;
         try
         {
             if (t.Loc.Kind == LocKind.Search) SetSearchText(t.Search);
@@ -98,6 +100,7 @@ public partial class MainWindow
     {
         SaveTab(_tab);
         var t = new TabState { Loc = at ?? new Location(LocKind.IndexRoot) };
+        t.GroupBy = DefaultGroupFor(t.Loc.Kind);
         if (t.Loc.IsPhysical) t.LastPhysLoc = t.Loc;
         else if (t.Loc.Kind != LocKind.Search) t.LastIndexLoc = t.Loc;
         _tabs.Insert(_tabs.IndexOf(_tab) + 1, t);

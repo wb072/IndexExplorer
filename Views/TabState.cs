@@ -28,4 +28,5 @@ public sealed partial class TabState : ObservableObject
     public Dictionary<string, HashSet<string>> Filters { get; set; } = [];
     public List<string> SelectedKeys { get; set; } = [];
     public double ScrollOffset { get; set; }
+    public GroupBy GroupBy { get; set; } = GroupBy.None;
 }

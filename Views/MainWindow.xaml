@@ -163,6 +163,49 @@
         </Style>
 
         <!-- 첫 줄이 열 제목 아래 선에 붙지 않도록 위에 살짝 여백 -->
+        <!--
+            묶어 보기 머리줄 (탐색기의 그룹과 같음): 펼침 화살표 · 폴더 아이콘 · 폴더 이름 · 개수 · 상위 경로 · 열기
+            머리줄 아무 곳이나 누르면 접고 편다.
+        -->
+        <Style x:Key="GroupBox" TargetType="GroupItem">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="GroupItem">
+                        <StackPanel>
+                            <Border x:Name="Hdr" Margin="6,8,6,0" Padding="2,0,8,0" Height="30" CornerRadius="6" Background="Transparent"
+                                    MouseLeftButtonUp="GroupHeader_Click" Cursor="Hand">
+                                <DockPanel>
+                                    <Button x:Name="OpenBtn" DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="폴더 열기" FontSize="12"
+                                            Margin="12,0,0,0" VerticalAlignment="Center" Click="GroupOpen_Click" Tag="{Binding Name}" Opacity="0"
+                                            Visibility="{Binding Name, Converter={StaticResource IsPathToVis}}" ToolTip="이 원본 폴더로 이동" />
+                                    <ToggleButton x:Name="Toggle" DockPanel.Dock="Left" Style="{StaticResource ExpanderToggle}" IsChecked="True" />
+                                    <Image DockPanel.Dock="Left" Source="{DynamicResource GroupFolderIcon}" Width="16" Height="16" Margin="2,0,8,0"
+                                           VerticalAlignment="Center" Visibility="{Binding Name, Converter={StaticResource IsPathToVis}}" />
+                                    <TextBlock DockPanel.Dock="Left" Text="{Binding Name, Converter={StaticResource PathLeaf}}" FontWeight="SemiBold"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock DockPanel.Dock="Left" Text="{Binding ItemCount, StringFormat={}{0:N0}}" Foreground="{StaticResource AccentBrush}"
+                                               FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Name, Converter={StaticResource PathParent}}" Foreground="{StaticResource MutedBrush}" FontSize="12"
+                                               Margin="12,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                </DockPanel>
+                            </Border>
+                            <Rectangle Height="1" Fill="{StaticResource HairlineBrush}" Margin="12,0,12,3" />
+                            <ItemsPresenter x:Name="Items" />
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger SourceName="Toggle" Property="IsChecked" Value="False">
+                                <Setter TargetName="Items" Property="Visibility" Value="Collapsed" />
+                            </Trigger>
+                            <Trigger SourceName="Hdr" Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Hdr" Property="Background" Value="{StaticResource RowHoverBrush}" />
+                                <Setter TargetName="OpenBtn" Property="Opacity" Value="1" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <ItemsPanelTemplate x:Key="RowsPanel"><VirtualizingStackPanel Margin="0,4,0,0" /></ItemsPanelTemplate>
         <ItemsPanelTemplate x:Key="TilesPanel"><WrapPanel Margin="8,6" /></ItemsPanelTemplate>
 
@@ -525,7 +568,12 @@
                       SelectionChanged="List_SelectionChanged" PreviewMouseLeftButtonDown="List_PreviewLeftDown" PreviewMouseLeftButtonUp="List_PreviewLeftUp"
                       PreviewMouseMove="List_PreviewMouseMove" PreviewMouseRightButtonUp="List_PreviewRightUp"
                       AllowDrop="True" DragOver="List_DragOver" Drop="List_Drop" DragLeave="List_DragLeave"
-                      GridViewColumnHeader.Click="Header_Click" KeyDown="List_KeyDown" LostMouseCapture="List_LostMouseCapture" />
+                      GridViewColumnHeader.Click="Header_Click" KeyDown="List_KeyDown" LostMouseCapture="List_LostMouseCapture"
+                      VirtualizingPanel.IsVirtualizingWhenGrouping="True">
+                <ListView.GroupStyle>
+                    <GroupStyle ContainerStyle="{StaticResource GroupBox}" HidesIfEmpty="True" />
+                </ListView.GroupStyle>
+            </ListView>
             <!-- 끌어서 여러 개 선택 (범위 선택) 사각형 -->
             <Canvas x:Name="MarqueeLayer" IsHitTestVisible="False">
                 <Rectangle x:Name="MarqueeRect" Visibility="Collapsed" Fill="#1A0066CC" Stroke="#B30066CC" StrokeThickness="1" RadiusX="2" RadiusY="2" />

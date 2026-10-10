@@ -25,6 +25,25 @@ public partial class MainWindow
     private DispatcherTimer? _marqueeTimer;
     private ListViewItem? _rowClick;
     private ListItem? _anchor;
+    private HashSet<ListItem> _marqueeSticky = [];
+
+    /// <summary>화면에 만들어져 있는 목록 칸 전부 (묶음 안에 든 것 포함).</summary>
+    private IEnumerable<ListViewItem> RealizedContainers()
+    {
+        if (_mScp == null) yield break;
+        var stack = new Stack<DependencyObject>();
+        stack.Push(_mScp);
+        while (stack.Count > 0)
+        {
+            var d = stack.Pop();
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(d); i++)
+            {
+                var c = VisualTreeHelper.GetChild(d, i);
+                if (c is ListViewItem lvi) yield return lvi;
+                else stack.Push(c);
+            }
+        }
+    }
 
     private static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject
     {
@@ -62,8 +81,9 @@ public partial class MainWindow
     {
         if (_mSv == null || _mScp == null) return false;
         _marqueeStart = new Point(p.X + _mSv.HorizontalOffset, p.Y + _mSv.VerticalOffset);
-        if (List.View != null) _mStartRow = RowPosAt(p.Y) ?? 0;
+        if (List.View != null && !IsGrouped) _mStartRow = RowPosAt(p.Y) ?? 0;
         _marqueeBase = Keyboard.Modifiers.HasFlag(ModifierKeys.Control) ? List.SelectedItems.Cast<ListItem>().ToHashSet() : [];
+        _marqueeSticky = [];
         _marqueeArmed = true;
         return true;
     }
@@ -123,7 +143,7 @@ public partial class MainWindow
         var startX = _marqueeStart.X - _mSv.HorizontalOffset;
         double startY;
 
-        if (List.View != null)
+        if (List.View != null && !IsGrouped)
         {
             // 자세히 보기: 시작 줄 ~ 지금 줄 (화면 밖으로 지나간 줄 포함)
             var curRow = RowPosAt(p.Y) ?? 0;
@@ -136,15 +156,22 @@ public partial class MainWindow
         }
         else
         {
-            // 큰 아이콘 보기: 모든 칸이 만들어져 있으므로 실제 위치로
+            // 큰 아이콘 보기·묶어 보기: 화면에 그려진 칸의 실제 위치로 (묶음 머리줄이 끼어 있어도 정확)
+            // 스크롤로 화면 밖에 나간 칸은 이전 판정을 유지한다
             startY = _marqueeStart.Y - _mSv.VerticalOffset;
             var r = new Rect(new Point(startX, startY), p);
-            for (int i = 0; i < n; i++)
+            var realized = new HashSet<ListItem>();
+            foreach (var c in RealizedContainers())
             {
-                if (List.ItemContainerGenerator.ContainerFromIndex(i) is not ListViewItem c || c.ActualWidth == 0) continue;
-                var pt = c.TranslatePoint(new Point(3, 3), _mScp);
-                if (new Rect(pt, new Size(c.ActualWidth - 6, c.ActualHeight - 6)).IntersectsWith(r)) hits.Add((ListItem)List.Items[i]);
+                if (c.DataContext is not ListItem item || c.ActualWidth == 0 || !c.IsVisible) continue;
+                realized.Add(item);
+                var inset = List.View == null ? 3 : 0;
+                var pt = c.TranslatePoint(new Point(inset, inset), _mScp);
+                if (new Rect(pt, new Size(Math.Max(0, c.ActualWidth - 2 * inset), Math.Max(0, c.ActualHeight - 2 * inset))).IntersectsWith(r))
+                    hits.Add(item);
             }
+            foreach (var s in _marqueeSticky) if (!realized.Contains(s)) hits.Add(s);
+            _marqueeSticky = hits.Except(_marqueeBase).ToHashSet();
         }
 
         // 사각형 그리기 (화면 좌표)

@@ -913,6 +913,7 @@ public partial class MainWindow
             sort.Items.Add(mi);
         }
         menu.Items.Add(sort);
+        menu.Items.Add(GroupMenu());
         var refresh = new MenuItem { Header = "새로 고침", InputGestureText = "F5" };
         refresh.Click += (_, _) => RefreshAll();
         menu.Items.Add(refresh);

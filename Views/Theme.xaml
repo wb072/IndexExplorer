@@ -62,6 +62,9 @@
     <v:BoolToVisConverter x:Key="BoolToVis" />
     <v:BoolToVisConverter x:Key="NotBoolToVis" Invert="True" />
     <v:EmptyToCollapsedConverter x:Key="EmptyToCollapsed" />
+    <v:PathLeafConverter x:Key="PathLeaf" />
+    <v:PathParentConverter x:Key="PathParent" />
+    <v:IsPathToVisConverter x:Key="IsPathToVis" />
 
     <!-- ===== 사이드바 전용 아이콘 (둥근 색 사각형 + 흰 기호) ===== -->
 

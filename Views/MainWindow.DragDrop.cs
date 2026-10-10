@@ -47,6 +47,8 @@ public partial class MainWindow
         if (FindAncestor<TextBox>(src) != null) return;
         if (FindAncestor<System.Windows.Controls.Primitives.ScrollBar>(src) != null || FindAncestor<GridViewColumnHeader>(src) != null) return;
         var container = FindAncestor<ListViewItem>(src);
+        // 묶음 머리줄(접기·폴더 열기)은 그 자체 동작에 맡긴다
+        if (container == null && OnGroupHeader(src)) return;
         if (container == null)
         {
             // 빈 곳: 선택 해제 (탐색기와 같음), 그대로 끌면 범위 선택
@@ -75,6 +77,14 @@ public partial class MainWindow
             container.Focus();
             e.Handled = true;
         }
+    }
+
+    /// <summary>묶음 머리줄 위인가 (머리줄 안의 빈 곳이 아니라 머리줄 자체).</summary>
+    private static bool OnGroupHeader(DependencyObject? d)
+    {
+        for (; d != null && d is not GroupItem; d = d is System.Windows.Media.Visual ? System.Windows.Media.VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d))
+            if (d is FrameworkElement { Name: "Hdr" }) return true;
+        return false;
     }
 
     private void List_PreviewLeftUp(object sender, MouseButtonEventArgs e)

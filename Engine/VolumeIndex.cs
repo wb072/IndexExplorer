@@ -37,6 +37,30 @@ public sealed class VolumeIndex
     private readonly Dictionary<int, bool> _systemDir = [];   // 폴더 칸 → 시스템 폴더 아래인가 (캐시)
     /// <summary>폴더(파일 번호)별 바로 안의 시스템 파일(dll 등) 수 — 프로그램이 설치된 폴더를 알아보는 데 쓴다.</summary>
     private readonly Dictionary<ulong, int> _sysFilesIn = [];
+    /// <summary>폴더(파일 번호)별 바로 안의 개발 프로젝트 파일(.csproj, package.json …) 수 — 개발 프로젝트는 빌드 결과물만 숨긴다.</summary>
+    private readonly Dictionary<ulong, int> _projFilesIn = [];
+
+    private static readonly HashSet<string> ProjectMarkers = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "package.json", "pom.xml", "build.gradle", "build.gradle.kts", "CMakeLists.txt", "Cargo.toml", "pyproject.toml", "go.mod", "Makefile",
+    };
+    private static readonly HashSet<string> ProjectExts = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".csproj", ".sln", ".slnx", ".vcxproj", ".fsproj", ".vbproj", ".xcodeproj", ".uproject",
+    };
+
+    private static bool IsProjectMarker(ReadOnlySpan<char> name)
+    {
+        var dot = name.LastIndexOf('.');
+        return (dot >= 0 && ProjectExts.Contains(name[dot..].ToString())) || ProjectMarkers.Contains(name.ToString());
+    }
+
+    private void CountProj(ulong parent, int delta)
+    {
+        var after = _projFilesIn.GetValueOrDefault(parent) + delta;
+        if (after <= 0) _projFilesIn.Remove(parent); else _projFilesIn[parent] = after;
+        InvalidateDirs();
+    }
     private const byte SystemKind = 12;
     public const int ProgramFolderThreshold = 3;
 
@@ -85,6 +109,8 @@ public sealed class VolumeIndex
                 if (isTop || UserPlaces.Contains(name) || (parent >= 0 && UserPlaces.Contains(_pool.AsSpan(_nameOff[parent], _nameLen[parent]).ToString()) && up > 0))
                     break;
                 set.Add(cur);
+                // 부모가 개발 프로젝트(.csproj, package.json …)면 빌드 결과물(bin 등)까지만 숨기고 프로젝트는 지킨다
+                if (parent >= 0 && _projFilesIn.ContainsKey(_frn[parent])) break;
                 cur = parent;
             }
         }
@@ -138,6 +164,11 @@ public sealed class VolumeIndex
             _parent[s] = parent;
             _attr[s] = attr;
             _kind[s] = (attr & AttrDirectory) != 0 ? FileKinds.None : FileKinds.Of(name);
+            if (!sameName || oldParent != parent)
+            {
+                // 이름이 바뀌기 전 판단은 기록이 없으므로, 새 이름 기준으로만 다시 센다 (드묾)
+                if ((attr & AttrDirectory) == 0 && IsProjectMarker(name)) { if (oldParent != parent || !sameName) CountProj(parent, +1); }
+            }
             if (oldKind == SystemKind && (_kind[s] != SystemKind || oldParent != parent)) CountSys(oldParent, -1);
             if (_kind[s] == SystemKind && (oldKind != SystemKind || oldParent != parent)) CountSys(parent, +1);
             return;
@@ -152,6 +183,7 @@ public sealed class VolumeIndex
         SetName(s, name);
         _slotOf[frn] = s;
         if (_kind[s] == SystemKind) CountSys(parent, +1);
+        if ((attr & AttrDirectory) == 0 && IsProjectMarker(name)) CountProj(parent, +1);
     }
 
     public void Remove(ulong frn)
@@ -159,6 +191,7 @@ public sealed class VolumeIndex
         if (!_slotOf.Remove(frn, out var s)) return;
         if ((_attr[s] & AttrDirectory) != 0) InvalidateDirs();
         if (_kind[s] == SystemKind) CountSys(_parent[s], -1);
+        if ((_attr[s] & AttrDirectory) == 0 && IsProjectMarker(_pool.AsSpan(_nameOff[s], _nameLen[s]))) CountProj(_parent[s], -1);
         _poolGarbage += _nameLen[s];
         _frn[s] = 0;
         _nameLen[s] = 0;
@@ -172,6 +205,7 @@ public sealed class VolumeIndex
         _free.Clear();
         InvalidateDirs();
         _sysFilesIn.Clear();
+        _projFilesIn.Clear();
         _slots = 0;
         _poolUsed = 0;
         _poolGarbage = 0;

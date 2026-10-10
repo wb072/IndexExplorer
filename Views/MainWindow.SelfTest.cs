@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -81,7 +82,7 @@ public partial class MainWindow
                 await WaitUntil(() => _kindResult is { kind: 7 }, 20000);
                 await Settle(800);
                 Check("실제 엔진: PC 전체 이미지", _engineUp && _items.Count > 0 && _items.Count == Math.Min(_engineCounts![7], KindQueryMax),
-                    $"{_items.Count:N0}개 (엔진 {_engineCounts?[7]:N0}), 배지 {KindNode(7)?.Badge}");
+                    $"{_items.Count:N0}개 (엔진 {_engineCounts?[7]:N0}), 배지 {KindNode(7)?.Badge}, 폴더 {_view.Groups?.Count}곳");
                 List.SelectedItems.Clear();
                 await Settle(600);
                 Shot("21_엔진_이미지");
@@ -509,7 +510,21 @@ public partial class MainWindow
                     v.Upsert(94, 93, "구조.png", 0x20);
                     v.Upsert(98, 90, "내목소리.png", 0x20);            // VoiceAI 바로 안 → 보임
                 });
-                var pc = pv.Query(7, null, false, 10).Where(h => !h.Path.Contains("VoiceAI")).ToList();
+                pv.Write(v =>
+                {
+                    v.Upsert(100, 70, "내앱", Dir);                     // 개발 프로젝트 → 지킴
+                    v.Upsert(101, 100, "내앱.csproj", 0x20);
+                    v.Upsert(102, 100, "Assets", Dir);
+                    v.Upsert(103, 102, "로고.png", 0x20);              // 보임
+                    v.Upsert(104, 100, "bin", Dir);
+                    v.Upsert(105, 104, "Debug", Dir);
+                    for (ulong i = 0; i < 3; i++) v.Upsert(106 + i, 105, $"a{i}.dll", 0x20);
+                    v.Upsert(110, 105, "빌드그림.png", 0x20);           // 빌드 결과물 → 숨김
+                });
+                var dev = pv.Query(7, null, false, 20).Where(h => h.Path.Contains("내앱")).Select(h => h.Path).ToList();
+                Check("잡동사니: 개발 프로젝트는 빌드 결과물(bin)만 숨기고 프로젝트는 지킴",
+                    dev.Count == 1 && dev[0] == @"W:\개발\내앱\Assets\로고.png", string.Join(", ", dev));
+                var pc = pv.Query(7, null, false, 10).Where(h => !h.Path.Contains("VoiceAI") && !h.Path.Contains("내앱")).ToList();
                 var pcVoice = pv.Query(7, null, false, 10).Where(h => h.Path.Contains("VoiceAI")).Select(h => h.Path).ToList();
                 Check("잡동사니: 드라이브 바로 아래 폴더 안의 프로그램(GPT-SoVITS)은 숨기고 그 폴더는 지킴",
                     pcVoice.Count == 1 && pcVoice[0] == @"W:\VoiceAI\내목소리.png", string.Join(", ", pcVoice));
@@ -541,6 +556,49 @@ public partial class MainWindow
                 $"{_items.Count}개, 배지 {KindNode(1)?.Badge}");
             Check("파일 종류: 트리 선택·제목", KindNode(1)?.IsSelected == true && _tab.Title == "엑셀");
             Shot("20_파일종류_엑셀");
+
+            // 28) 묶어 보기: 파일 종류는 폴더별이 기본
+            var dirs = _items.Select(i => i.Location).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+            Check("묶어 보기: 파일 종류는 처음부터 폴더별", _groupBy == GroupBy.Folder && _view.Groups?.Count == dirs, $"폴더 {_view.Groups?.Count}곳 / 실제 {dirs}곳");
+            Check("묶어 보기: 상태 표시줄에 폴더 수", StatusLeft.Text.Contains("폴더"), StatusLeft.Text);
+            // 묶은 상태에서 범위 선택: 목록 맨 위에서 맨 아래까지 끌면 모두
+            if (FindListScroll())
+            {
+                List.SelectedItems.Clear();
+                ArmMarqueeAt(new Point(300, 2));
+                StartMarquee();
+                UpdateMarquee(new Point(320, _mScp!.ActualHeight - 4));
+                var gsel = List.SelectedItems.Count;
+                EndMarquee();
+                Check("묶어 보기: 범위 선택 (머리줄이 끼어 있어도)", gsel == _items.Count, $"{gsel}/{_items.Count}");
+            }
+            // 접기
+            var firstToggle = FindDescendant<System.Windows.Controls.Primitives.ToggleButton>(FindDescendant<GroupItem>(List)!);
+            firstToggle!.IsChecked = false;
+            await Settle(300);
+            var hiddenRows = FindDescendant<GroupItem>(List) is { } gi && FindDescendant<ItemsPresenter>(gi) is { Visibility: Visibility.Collapsed };
+            Check("묶어 보기: 머리줄로 접기", hiddenRows);
+            firstToggle.IsChecked = true;
+            Shot("22_묶어보기_폴더별");
+            // 날짜별·유형별
+            Navigate(new Location(LocKind.Dir, Path: P("Downloads")));
+            await Settle(300);
+            Check("묶어 보기: 원본 보기는 기본으로 묶지 않음", _groupBy == GroupBy.None && !IsGrouped);
+            SetGroupBy(GroupBy.Date);
+            await Settle(300);
+            Check("묶어 보기: 수정한 날짜별 (오늘)", _view.Groups?.Count == 1 && (_view.Groups[0] as CollectionViewGroup)?.Name as string == "오늘", (_view.Groups?[0] as CollectionViewGroup)?.Name?.ToString() ?? "");
+            SetGroupBy(GroupBy.Type);
+            await Settle(300);
+            Check("묶어 보기: 유형별", _view.Groups?.Count == _items.Select(i => i.TypeName).Distinct().Count());
+            Shot("23_묶어보기_유형별");
+            // 탭마다 기억
+            NewTab(new Location(LocKind.FileKind, 1));
+            await Settle(300);
+            var newTabGroup = _groupBy;
+            CloseTab(_tab);
+            await Settle(300);
+            Check("묶어 보기: 탭마다 따로 기억", newTabGroup == GroupBy.Folder && _groupBy == GroupBy.Type && _loc.Kind == LocKind.Dir, $"새 탭 {newTabGroup}, 돌아온 탭 {_groupBy}");
+            SetGroupBy(GroupBy.None);
 
             // 20) 창 두 개: 한 창에서 복사 → 다른 창의 색인 폴더에 붙여넣기 = 연결 (복사본 안 생김)
             var w2 = App.OpenWindow(new Location(LocKind.IndexFolder, r.Id), this);

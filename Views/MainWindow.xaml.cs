@@ -429,6 +429,7 @@ public partial class MainWindow : Window
         else if (loc.Kind != LocKind.Search) { _lastIndexLoc = loc; SetMode(false); }
 
         _filters.Clear(); // 다른 곳으로 가면 필터는 풀린다 (탐색기와 같음)
+        if (!_restoringTab) _groupBy = DefaultGroupFor(loc.Kind);
         LoadItems(reset: true);
         if (selectPath != null) SelectPaths([selectPath]);
         UpdateCrumb();
@@ -679,6 +680,7 @@ public partial class MainWindow : Window
             _items = new ObservableCollection<ListItem>(list);
             _view = new ListCollectionView(_items) { CustomSort = new ItemComparer(_sortKey, _sortDesc) };
             if (_filters.Count > 0) _view.Filter = PassesFilter;
+            ApplyGrouping();
             List.ItemsSource = _view;
             if (List.Items.Count > 0) List.ScrollIntoView(List.Items[0]);
         }
@@ -722,6 +724,7 @@ public partial class MainWindow : Window
     {
         var showLoc = _loc.Kind is LocKind.IndexFolder or LocKind.Recent or LocKind.Inbox or LocKind.AllFiles or LocKind.FileKind or LocKind.Search or LocKind.ThisPC;
         var showIdx = _loc.Kind is LocKind.Dir or LocKind.Recent or LocKind.AllFiles or LocKind.FileKind or LocKind.Search;
+        if (_groupBy == GroupBy.Folder) showLoc = false; // 폴더별로 묶으면 머리줄에 경로가 있으므로
         // 최근 문서에서는 날짜 열이 "마지막으로 쓴 때"
         _colInfo[_grid.Columns.First(col => _colInfo.TryGetValue(col, out var i) && i.key == "Modified")] = ("Modified", _loc.Kind == LocKind.Recent ? "최근 사용" : "수정한 날짜");
         _colInfo[_colLocation] = ("Location", _loc.Kind == LocKind.ThisPC ? "여유 공간" : "원본 위치");
@@ -779,7 +782,7 @@ public partial class MainWindow : Window
             var size = sel.Where(i => i.Size.HasValue).Sum(i => i.Size!.Value);
             if (size > 0) text += $"  ·  {ListItem.FormatBytes(size)}";
         }
-        StatusLeft.Text = text;
+        StatusLeft.Text = text + GroupSummary();
     }
 
     private void List_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -887,6 +890,8 @@ public partial class MainWindow : Window
         desc.Click += (_, _) => SetSort(_sortKey, true);
         menu.Items.Add(asc);
         menu.Items.Add(desc);
+        menu.Items.Add(new Separator());
+        menu.Items.Add(GroupMenu());
         OpenMenuUnder(menu, (FrameworkElement)sender);
     }
 
