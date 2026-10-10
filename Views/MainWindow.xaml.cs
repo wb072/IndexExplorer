@@ -86,6 +86,9 @@ public partial class MainWindow : Window
     {
         base.OnSourceInitialized(e);
         ShellImages.Scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
+        NotepadIcon.Source = ShellImages.Icon(SysExe("notepad.exe"), false);
+        CmdIcon.Source = ShellImages.Icon(SysExe("cmd.exe"), false);
+        PsIcon.Source = ShellImages.Icon(SysExe(@"WindowsPowerShell\v1.0\powershell.exe"), false);
         // 원본 = 윈도우 "파일 탐색기" 프로그램 아이콘 그대로
         ModePhysIcon.Source = ShellImages.Icon(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"), false);
         if (!KeepPosition) RestoreBounds_();

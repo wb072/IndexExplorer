@@ -386,6 +386,15 @@ public partial class MainWindow
             SwitchTo(_tabs[0]);
             await Settle(300);
 
+            // 25) 윈도우 도구 버튼
+            Check("메모장·cmd·PowerShell 아이콘 (윈도우 프로그램에서)", NotepadIcon.Source != null && CmdIcon.Source != null && PsIcon.Source != null);
+            Navigate(new Location(LocKind.Dir, Path: P("업무")));
+            Check("명령 창 폴더: 원본 폴더는 그 폴더", ConsoleDir() == P("업무"), ConsoleDir());
+            Navigate(new Location(LocKind.IndexFolder, b.Id));
+            await Settle(300);
+            SelectNamed("B사_계약서_2026.pdf");
+            Check("명령 창 폴더: 색인에선 선택한 파일의 실제 폴더", ConsoleDir() == P(@"업무\계약"), ConsoleDir());
+
             // 20) 창 두 개: 한 창에서 복사 → 다른 창의 색인 폴더에 붙여넣기 = 연결 (복사본 안 생김)
             var w2 = App.OpenWindow(new Location(LocKind.IndexFolder, r.Id), this);
             await Settle(900);

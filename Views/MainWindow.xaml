@@ -387,6 +387,17 @@
         <Border Grid.Row="1" Grid.ColumnSpan="3" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1" Padding="10,0,12,6">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <!-- 윈도우 도구: 아이콘은 실제 프로그램에서 가져온다 -->
+                    <Button Style="{StaticResource IconTool}" Click="Notepad_Click" ToolTip="메모장으로 열기&#x0a;선택한 파일을 메모장으로 엽니다 (선택이 없으면 새 메모장)">
+                        <Image x:Name="NotepadIcon" Width="16" Height="16" />
+                    </Button>
+                    <Button Style="{StaticResource IconTool}" Click="Cmd_Click" ToolTip="명령 프롬프트&#x0a;지금 폴더에서 cmd 를 엽니다">
+                        <Image x:Name="CmdIcon" Width="16" Height="16" />
+                    </Button>
+                    <Button Style="{StaticResource IconTool}" Click="PowerShell_Click" ToolTip="PowerShell&#x0a;지금 폴더에서 PowerShell 을 엽니다">
+                        <Image x:Name="PsIcon" Width="16" Height="16" />
+                    </Button>
+                    <Rectangle Width="1" Height="18" Fill="{StaticResource HairlineBrush}" Margin="8,0" />
                     <ToggleButton x:Name="DetailsBtn" Style="{StaticResource IconToggle}" Click="DetailsView_Click" ToolTip="자세히 (Ctrl+Shift+6)">
                         <TextBlock Text="&#xE8FD;" Style="{StaticResource Glyph}" FontSize="14" Foreground="#3B82D6" />
                     </ToggleButton>

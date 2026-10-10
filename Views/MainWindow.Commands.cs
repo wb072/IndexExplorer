@@ -812,6 +812,8 @@ public partial class MainWindow
             extras.Add(new("원본 위치 열기", () => RevealOriginal(sel[0])));
         if (files.Count > 0)
             extras.Add(new("색인에 추가…", () => BuildFolderPicker(id => LinkItems(id, files)).IsOpen = true));
+        if (sel.Any(i => i.Kind == ItemKind.File))
+            extras.Add(new("메모장으로 열기", () => OpenInNotepad(sel)));
         if (sel.Count == 1 && sel[0].Kind is ItemKind.Dir or ItemKind.Drive)
         {
             extras.Insert(0, new("새 창에서 열기", () => OpenNewWindow(new Location(LocKind.Dir, Path: sel[0].Path))));
@@ -912,6 +914,13 @@ public partial class MainWindow
         var refresh = new MenuItem { Header = "새로 고침", InputGestureText = "F5" };
         refresh.Click += (_, _) => RefreshAll();
         menu.Items.Add(refresh);
+        menu.Items.Add(new Separator());
+        var cmd = new MenuItem { Header = "여기서 명령 프롬프트 열기", Icon = MenuIcon(CmdIcon.Source) };
+        cmd.Click += (_, _) => OpenConsoleHere(powerShell: false);
+        menu.Items.Add(cmd);
+        var ps = new MenuItem { Header = "여기서 PowerShell 열기", Icon = MenuIcon(PsIcon.Source) };
+        ps.Click += (_, _) => OpenConsoleHere(powerShell: true);
+        menu.Items.Add(ps);
 
         if (_loc.Kind is LocKind.IndexRoot or LocKind.IndexFolder or LocKind.Dir)
         {
