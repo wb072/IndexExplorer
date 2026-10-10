@@ -332,16 +332,16 @@
         <Border Grid.Row="0" Grid.ColumnSpan="3" Padding="10,8,12,6">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
-                    <Button x:Name="BackBtn" Style="{StaticResource ToolButtonB}" Click="Back_Click" ToolTip="뒤로 (Alt+←)">
+                    <Button x:Name="BackBtn" Style="{StaticResource IconTool}" Click="Back_Click" ToolTip="뒤로 (Alt+←)">
                         <TextBlock Text="&#xE72B;" Style="{StaticResource Glyph}" FontSize="14" />
                     </Button>
-                    <Button x:Name="FwdBtn" Style="{StaticResource ToolButtonB}" Click="Forward_Click" ToolTip="앞으로 (Alt+→)">
+                    <Button x:Name="FwdBtn" Style="{StaticResource IconTool}" Click="Forward_Click" ToolTip="앞으로 (Alt+→)">
                         <TextBlock Text="&#xE72A;" Style="{StaticResource Glyph}" FontSize="14" />
                     </Button>
-                    <Button x:Name="UpBtn" Style="{StaticResource ToolButtonB}" Click="Up_Click" ToolTip="상위 폴더로 (Alt+↑)">
+                    <Button x:Name="UpBtn" Style="{StaticResource IconTool}" Click="Up_Click" ToolTip="상위 폴더로 (Alt+↑)">
                         <TextBlock Text="&#xE74A;" Style="{StaticResource Glyph}" FontSize="14" />
                     </Button>
-                    <Button Style="{StaticResource ToolButtonB}" Click="Refresh_Click" ToolTip="새로 고침 (F5)">
+                    <Button Style="{StaticResource IconTool}" Click="Refresh_Click" ToolTip="새로 고침 (F5)">
                         <TextBlock Text="&#xE72C;" Style="{StaticResource Glyph}" FontSize="13" />
                     </Button>
                 </StackPanel>
