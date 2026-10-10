@@ -64,17 +64,7 @@
     <v:EmptyToCollapsedConverter x:Key="EmptyToCollapsed" />
 
     <!-- ===== 사이드바 전용 아이콘 (둥근 색 사각형 + 흰 기호) ===== -->
-    <DrawingImage x:Key="IconIndexRoot">
-        <DrawingImage.Drawing>
-            <DrawingGroup>
-                <GeometryDrawing Brush="#7F77DD" Geometry="M3,0 H13 A3,3 0 0 1 16,3 V13 A3,3 0 0 1 13,16 H3 A3,3 0 0 1 0,13 V3 A3,3 0 0 1 3,0 Z" />
-                <GeometryDrawing Geometry="M8,5.2 V8 M4.5,10.5 V8 H11.5 V10.5">
-                    <GeometryDrawing.Pen><Pen Brush="White" Thickness="1.2" /></GeometryDrawing.Pen>
-                </GeometryDrawing>
-                <GeometryDrawing Brush="White" Geometry="M6.6,2.6 H9.4 V5.4 H6.6 Z M3.1,10.4 H5.9 V13.2 H3.1 Z M10.1,10.4 H12.9 V13.2 H10.1 Z" />
-            </DrawingGroup>
-        </DrawingImage.Drawing>
-    </DrawingImage>
+
     <DrawingImage x:Key="IconInbox">
         <DrawingImage.Drawing>
             <DrawingGroup>
@@ -95,16 +85,7 @@
             </DrawingGroup>
         </DrawingImage.Drawing>
     </DrawingImage>
-    <DrawingImage x:Key="IconDisk">
-        <DrawingImage.Drawing>
-            <DrawingGroup>
-                <GeometryDrawing Brush="#5B8DEF" Geometry="M3,0 H13 A3,3 0 0 1 16,3 V13 A3,3 0 0 1 13,16 H3 A3,3 0 0 1 0,13 V3 A3,3 0 0 1 3,0 Z" />
-                <GeometryDrawing Geometry="M3.6,5.2 H6.6 L7.6,6.3 H12.4 V11.6 H3.6 Z">
-                    <GeometryDrawing.Pen><Pen Brush="White" Thickness="1.1" LineJoin="Round" /></GeometryDrawing.Pen>
-                </GeometryDrawing>
-            </DrawingGroup>
-        </DrawingImage.Drawing>
-    </DrawingImage>
+
     <DrawingImage x:Key="IconAllFiles">
         <DrawingImage.Drawing>
             <DrawingGroup>

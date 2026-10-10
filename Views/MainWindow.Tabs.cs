@@ -180,7 +180,7 @@ public partial class MainWindow
         _tab.Title = title;
         _tab.Icon = _loc.Kind switch
         {
-            LocKind.IndexRoot => (ImageSource)FindResource("IconIndexRoot"),
+            LocKind.IndexRoot => (ImageSource)FindResource("IconAppSmall"),
             LocKind.IndexFolder => ShellImages.Icon(Services.Settings.DataDir, true),
             LocKind.Recent => (ImageSource)FindResource("IconRecent"),
             LocKind.Inbox => (ImageSource)FindResource("IconInbox"),

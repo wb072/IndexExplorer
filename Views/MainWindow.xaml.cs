@@ -86,7 +86,8 @@ public partial class MainWindow : Window
     {
         base.OnSourceInitialized(e);
         ShellImages.Scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
-        ModePhysIcon.Source = ShellImages.Icon(Path.GetTempPath(), true); // 원본 = 윈도우 탐색기의 노란 폴더
+        // 원본 = 윈도우 "파일 탐색기" 프로그램 아이콘 그대로
+        ModePhysIcon.Source = ShellImages.Icon(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"), false);
         if (!KeepPosition) RestoreBounds_();
         else SidebarCol.Width = new GridLength(Math.Clamp(_settings.SidebarWidth, 170, 480));
 
@@ -190,7 +191,7 @@ public partial class MainWindow : Window
             : AllNodes(_indexNodes).Where(n => n.IsExpanded && n.Kind == NodeKind.IndexFolder).Select(n => n.FolderId).ToHashSet();
         var rootExpanded = _indexRoot?.IsExpanded ?? true;
 
-        _indexRoot = new TreeNode { Kind = NodeKind.IndexRoot, Name = "색인", Icon = (ImageSource)FindResource("IconIndexRoot"), IsExpanded = rootExpanded };
+        _indexRoot = new TreeNode { Kind = NodeKind.IndexRoot, Name = "색인", Icon = (ImageSource)FindResource("IconAppSmall"), IsExpanded = rootExpanded };
         AddFolderNodes(_indexRoot, null, expanded);
         _recentNode = new TreeNode { Kind = NodeKind.Recent, Name = "최근 문서", Icon = (ImageSource)FindResource("IconRecent") };
         _inboxNode = new TreeNode { Kind = NodeKind.Inbox, Name = "미분류 함", Icon = (ImageSource)FindResource("IconInbox") };

@@ -437,7 +437,7 @@
                     <Rectangle Width="1" Height="18" Fill="{StaticResource HairlineBrush}" Margin="8,0" />
                     <Button x:Name="AddIndexBtn" Style="{StaticResource ToolButtonB}" Click="AddToIndexMenu_Click" ToolTip="선택한 파일을 색인 폴더에 연결 (파일은 옮기지 않음)">
                         <StackPanel Orientation="Horizontal">
-                            <Image Source="{StaticResource IconIndexRoot}" Width="14" Height="14" />
+                            <Image Source="{StaticResource IconAppSmall}" Width="16" Height="16" />
                             <TextBlock Text="색인에 추가" Margin="7,0,3,0" VerticalAlignment="Center" />
                             <TextBlock Text="&#xE70D;" Style="{StaticResource Glyph}" FontSize="9" Foreground="{StaticResource SecondaryBrush}" />
                         </StackPanel>
@@ -473,7 +473,7 @@
                         <RadioButton x:Name="ModeIndex" Style="{StaticResource Segment}" GroupName="Mode" IsChecked="True" Checked="Mode_Checked"
                                      ToolTip="색인 · 찾기 위한 목차, 파일은 제자리에 (Ctrl+1)">
                             <StackPanel Orientation="Horizontal">
-                                <Image Source="{StaticResource IconApp}" Width="17" Height="17" Margin="0,0,7,0" RenderOptions.BitmapScalingMode="HighQuality" />
+                                <Image Source="{StaticResource IconAppSmall}" Width="16" Height="16" Margin="0,0,7,0" />
                                 <TextBlock Text="색인" VerticalAlignment="Center" />
                             </StackPanel>
                         </RadioButton>

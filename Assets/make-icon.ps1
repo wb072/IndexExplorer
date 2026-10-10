@@ -4,13 +4,15 @@ Add-Type -AssemblyName PresentationCore, PresentationFramework, WindowsBase
 $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $xaml = [IO.File]::ReadAllText((Join-Path $dir 'AppIcon.xaml'))
 $dict = [Windows.Markup.XamlReader]::Parse($xaml)
-$img = $dict['IconApp']
+$big = $dict['IconApp']
+$small = $dict['IconAppSmall']  # 16칸 격자 버전 (작은 크기에서 또렷)
 
 $sizes = 16, 20, 24, 32, 40, 48, 64, 128, 256
 $pngs = @()
 foreach ($s in $sizes) {
     $dv = New-Object Windows.Media.DrawingVisual
     $dc = $dv.RenderOpen()
+    $img = if ($s -le 24) { $small } else { $big }
     $dc.DrawImage($img, (New-Object Windows.Rect 0, 0, $s, $s))
     $dc.Close()
     $rtb = New-Object Windows.Media.Imaging.RenderTargetBitmap $s, $s, 96, 96, ([Windows.Media.PixelFormats]::Pbgra32)

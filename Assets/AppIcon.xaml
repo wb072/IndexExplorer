@@ -33,4 +33,28 @@
             </DrawingGroup>
         </DrawingImage.Drawing>
     </DrawingImage>
+    <!--
+        작은 크기용 (16·20·24px): 16칸 격자에 맞춰 다시 그림.
+        모든 가장자리를 정수 좌표에 두어 16px에서 선이 번지지 않는다.
+    -->
+    <DrawingImage x:Key="IconAppSmall">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="Transparent" Geometry="M0,0 H16 V16 H0 Z" />
+                <!-- 색인 탭 -->
+                <GeometryDrawing Brush="#BDB5F4" Geometry="M13,5 H15 V7 H13 Z" />
+                <GeometryDrawing Brush="#A196EE" Geometry="M13,8 H15 V10 H13 Z" />
+                <GeometryDrawing Brush="#8579E3" Geometry="M13,11 H15 V13 H13 Z" />
+                <!-- 폴더 뒷면 (귀 포함) -->
+                <GeometryDrawing Brush="#4C42AE" Geometry="M1,3 H6 L7,4 H13 V13 H1 Z" />
+                <!-- 폴더 앞면 -->
+                <GeometryDrawing Brush="#7D74E0" Geometry="M1,5 H13 V14 H1 Z" />
+                <GeometryDrawing Brush="#8E87EA" Geometry="M1,5 H13 V6 H1 Z" />
+                <!-- 목차 줄 -->
+                <GeometryDrawing Brush="#FFFFFF" Geometry="M3,7 H8 V8 H3 Z" />
+                <GeometryDrawing Brush="#E6E3FC" Geometry="M3,9 H10 V10 H3 Z" />
+                <GeometryDrawing Brush="#CFCAF7" Geometry="M3,11 H7 V12 H3 Z" />
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
 </ResourceDictionary>

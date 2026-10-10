@@ -185,7 +185,7 @@ public partial class MainWindow
                 ShowIndexFolderInfo(_loc.FolderId, setHeader: true);
                 break;
             case LocKind.IndexRoot:
-                SetPreviewImage((ImageSource)FindResource("IconIndexRoot"), true);
+                SetPreviewImage((ImageSource)FindResource("IconApp"), true);
                 PvTitle.Text = "색인";
                 PvSub.Text = $"색인 폴더 {_store.Folders.Count():N0}개";
                 Para("파일이 디스크 어디에 있든, 찾을 때 떠올리는 분류로 묶어 둡니다. 한 파일을 여러 색인에 넣을 수 있고, 파일은 옮기지 않습니다.");
