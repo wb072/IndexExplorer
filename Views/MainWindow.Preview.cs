@@ -207,6 +207,9 @@ public partial class MainWindow
                 Para("색인할 폴더에 있지만 아직 어떤 색인에도 연결되지 않은 파일입니다.");
                 Para("왼쪽 색인 폴더로 끌어다 놓거나 [색인에 추가]를 누르면 분류됩니다. 분류한 파일은 이 목록에서 사라집니다.");
                 break;
+            case LocKind.FileKind:
+                ShowKindInfo();
+                break;
             case LocKind.AllFiles:
                 SetPreviewImage((ImageSource)FindResource("IconAllFiles"), true);
                 PvTitle.Text = "모든 파일";

@@ -42,6 +42,16 @@
 - "엄지 색인": 보라 폴더 + 오른쪽 색인 탭 세 개 + 목차 줄. 벡터 원본은 `Assets/AppIcon.xaml`(`IconApp`)이고, `Assets/make-icon.ps1`로 `app.ico`(16~256px)를 만든다. 색인 스위치에는 이 아이콘을, 원본 스위치에는 윈도우의 노란 폴더 아이콘을 쓴다.
 - 리소스를 새로 추가했는데 "리소스가 없습니다" 오류가 나면 `dotnet build --no-incremental`로 다시 빌드한다.
 
+## 2.0 색인 엔진 (Engine/)
+- `NtfsVolume`: 디스크 장부(MFT) 전체 읽기 + 변경 기록(USN 저널) 이어 읽기. 꺼진 드라이브는 변경 기록을 켠다(사용자 승인, 최대 32MB).
+- `VolumeIndex`: 드라이브 하나의 압축 목록(파일 번호·부모 번호·이름). 경로는 부모를 따라 조립한다. 시스템 폴더(Windows, Program Files, AppData, site-packages, 휴지통 등)와 숨김 파일은 "사용자 파일"에서 뺀다. `%ProgramData%\IndexExplorer\engine\vol-<시리얼>.idx`에 저장해 두고, 변경 기록이 이어지면 재생만 한다(재부팅 후에도 다시 읽지 않음).
+- `EngineHost`: 드라이브마다 스레드 하나를 두고, 0.4초마다 변경 기록을 반영하고 5분마다 목록을 저장한다.
+- `EngineService` / `EngineInstaller`: `IndexExplorer.exe --service`로 도는 윈도우 서비스(LocalSystem). 설치하면 `C:\Program Files\IndexExplorer\Engine`에 복사본을 두어 개발 폴더의 exe를 잠그지 않는다.
+- `EnginePipeServer` / `EngineClient`: 이름 있는 파이프로 통신하고, 설치한 사용자·관리자만 접속할 수 있다. 화면 앱은 2초마다 개수만 묻고, 지금 보는 종류의 개수가 달라졌을 때나 F5를 누르면 목록을 다시 받는다.
+- 엔진이 없으면 화면은 1.0 방식으로 동작한다(색인한 폴더 안에서만).
+- 실행 옵션은 `Program.cs`에 있다: `--service`, `--install-service <SID>`, `--uninstall-service`, `--engine-console <파일>`(관리자 권한, 검증용), `--engine-check <파일>`(일반 권한, 접속 확인).
+- 측정값(이 PC): C: 61만 개 7.3초(처음 읽을 때) / 다시 시작하면 저장한 목록을 1.3초에 불러옴, D: 8만 개 0.6초. 50만 개 종류별 세기 0.05초.
+
 ## 구조
 - `Services/IndexStore.cs`: SQLite(`%AppData%\IndexExplorer\index.db`)와 메모리 캐시. 색인 폴더, 파일, 연결을 관리한다.
 - `Services/Indexer.cs`: 감시 폴더 전체 검사와 FileSystemWatcher 증분 검사. 대량 변경은 상위 폴더 단위로 묶어 처리한다.
@@ -50,13 +60,17 @@
 - `Views/MainWindow*.cs`: 화면. 탐색과 목록, 명령, 끌어다 놓기, 미리 보기, 자체 검증으로 나뉜다.
 - `Views/Theme.xaml`: 디자인 토큰과 컨트롤 스타일.
 
+## 브랜치
+- `1.0-stable` (+ 태그 `v1.0`): 완성된 1.0 안정판. 급한 수정만 이 브랜치에 한다.
+- `main`: 2.0 개발. 디스크 장부(NTFS MFT 전체 읽기 + USN 변경 기록 이어 읽기)로 모든 드라이브의 모든 파일을 색인하는 새 구조를 만든다. 종류별(확장자) 보기, 흩어진 파일 정리가 목표다.
+
 ## 빌드 · 검증
 ```bash
 dotnet build
 dotnet publish -c Release -p:PortableRelease=true -o release
 ```
 - `release\IndexExplorer.exe`: .NET 설치 없이 실행되는 단일 exe.
-- 자체 검증: `INDEXEXPLORER_DATA=<격리 폴더>`를 설정하고 `IndexExplorer.exe --selftest <결과 폴더> <테스트 루트>`로 실행한다. 실제 사용자 데이터와 분리된 상태에서 핵심 기능 48개 항목을 실행하고, `results.txt`와 화면 PNG를 남긴다. 테스트 루트에는 감시 폴더와 샘플 파일을 미리 만들어 둔다(`MainWindow.SelfTest.cs` 참고).
+- 자체 검증: `INDEXEXPLORER_DATA=<격리 폴더>`를 설정하고 `IndexExplorer.exe --selftest <결과 폴더> <테스트 루트>`로 실행한다. 실제 사용자 데이터와 분리된 상태에서 핵심 기능 58개 항목을 실행하고, `results.txt`와 화면 PNG를 남긴다. 테스트 루트에는 감시 폴더와 샘플 파일을 미리 만들어 둔다(`MainWindow.SelfTest.cs` 참고).
 - 화면 자동 입력이나 캡처는 PC 화면이 꺼져 있으면 동작하지 않는다. 자체 검증 모드를 우선 사용한다.
 
 ## 다음 후보

@@ -185,6 +185,7 @@ public partial class MainWindow
             LocKind.Recent => (ImageSource)FindResource("IconRecent"),
             LocKind.Inbox => (ImageSource)FindResource("IconInbox"),
             LocKind.AllFiles or LocKind.Search => (ImageSource)FindResource("IconAllFiles"),
+            LocKind.FileKind => KindIcon((byte)_loc.FolderId),
             LocKind.ThisPC => ShellImages.Icon("::{20D04FE0-3AEA-1069-A2D8-08002B30309D}", true, perPath: true),
             _ => ShellImages.Icon(_loc.Path, true, perPath: true),
         };

@@ -56,6 +56,24 @@
             </StackPanel>
         </Border>
 
+        <!-- PC 전체 색인 엔진 -->
+        <Border Margin="0,14,0,0" Background="White" CornerRadius="12" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="1" Padding="18,16">
+            <StackPanel>
+                <DockPanel>
+                    <Border x:Name="EngineBadge" DockPanel.Dock="Right" CornerRadius="6" Padding="8,2" Background="{StaticResource SidebarBrush}" VerticalAlignment="Center">
+                        <TextBlock x:Name="EngineStatus" FontSize="12" Foreground="{StaticResource SecondaryBrush}" Text="확인 중…" />
+                    </Border>
+                    <TextBlock Text="PC 전체 색인 엔진" FontSize="15" FontWeight="SemiBold" />
+                </DockPanel>
+                <TextBlock Margin="0,4,0,10" TextWrapping="Wrap" FontSize="12.5" Foreground="{StaticResource SecondaryBrush}" LineHeight="19"
+                           Text="디스크 장부를 직접 읽어 모든 드라이브의 파일을 몇 초 만에 모으고, 바뀌는 즉시 따라갑니다. 파일 종류 보기(엑셀만, 이미지만…)가 PC 전체에서 동작합니다. 읽기만 하며, 설치할 때 관리자 승인이 한 번 필요합니다." />
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Name="EngineInstallBtn" Style="{StaticResource PrimaryButton}" Content="설치" Click="EngineInstall_Click" />
+                    <Button x:Name="EngineRemoveBtn" Style="{StaticResource PearlButton}" Content="제거" Margin="8,0,0,0" Click="EngineRemove_Click" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
         <DockPanel Margin="0,22,0,0" LastChildFill="False">
             <Button x:Name="SaveBtn" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="저장" Padding="20,8" IsDefault="True" Click="Save_Click" />
             <Button x:Name="CancelBtn" DockPanel.Dock="Right" Style="{StaticResource PearlButton}" Content="취소" Padding="18,8" Margin="0,0,10,0" IsCancel="True" />

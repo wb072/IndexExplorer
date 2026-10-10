@@ -73,6 +73,20 @@ public partial class MainWindow
         var S = _settings.StorageRoot;
         try
         {
+            if (!App.Engine.Disabled)
+            {
+                // 실제 엔진 서비스로 화면 확인 (PC 전체 파일 종류 보기)
+                await WaitUntil(() => _engineUp, 10000);
+                Navigate(new Location(LocKind.FileKind, 7));
+                await WaitUntil(() => _kindResult is { kind: 7 }, 20000);
+                await Settle(800);
+                Check("실제 엔진: PC 전체 이미지", _engineUp && _items.Count > 0 && _items.Count == Math.Min(_engineCounts![7], KindQueryMax),
+                    $"{_items.Count:N0}개 (엔진 {_engineCounts?[7]:N0}), 배지 {KindNode(7)?.Badge}");
+                SelectNamed(_items.FirstOrDefault()?.Name ?? "");
+                await Settle(600);
+                Shot("21_엔진_이미지");
+                return;
+            }
             // 0) 아이콘 크기별 선명도 비교용 (윈도우 아이콘은 16·32·48·256 크기를 갖고 있다)
             var bat = Path.Combine(App.SelfTestOut!, "sample.bat");
             File.WriteAllText(bat, "@echo off");
@@ -409,6 +423,66 @@ public partial class MainWindow
             await Settle(300);
             SelectNamed("B사_계약서_2026.pdf");
             Check("명령 창 폴더: 색인에선 선택한 파일의 실제 폴더", ConsoleDir() == P(@"업무\계약"), ConsoleDir());
+
+            // 26) 엔진 저장소 (디스크 장부 압축 구조) — 장부·변경 기록을 흉내 내어
+            {
+                var vi = new IndexExplorer.Engine.VolumeIndex("X:");
+                const uint Dir = IndexExplorer.Engine.VolumeIndex.AttrDirectory;
+                ulong rootF = 5, users = 100, work = 101, win = 102, f1 = 200, f2 = 201, f3 = 202;
+                vi.Write(v =>
+                {
+                    v.Upsert(users, rootF, "업무", Dir);
+                    v.Upsert(work, users, "견적", Dir);
+                    v.Upsert(win, rootF, "Windows", Dir);
+                    v.Upsert(f1, work, "견적서.xlsx", 0x20);
+                    v.Upsert(f2, win, "system.xlsx", 0x20);
+                    v.Upsert(f3, work, "사진.png", 0x20);
+                });
+                var c1 = vi.CountByKind(false);
+                Check("엔진: 종류 분류·시스템 폴더 제외", c1[1] == 1 && c1[7] == 1 && vi.CountByKind(true)[1] == 2, $"엑셀 {c1[1]}, 이미지 {c1[7]}");
+                Check("엔진: 경로 조립", vi.PathOf(f1) == @"X:\업무\견적\견적서.xlsx", vi.PathOf(f1) ?? "");
+                // 변경 기록: 이름 변경 → 다른 폴더로 이동 → 삭제
+                vi.Write(v => IndexExplorer.Engine.EngineHost.Apply(v, f1, work, "견적서_최종.xlsx", 0x20, IndexExplorer.Engine.NtfsVolume.REASON_RENAME_NEW_NAME));
+                Check("엔진: 이름 변경 반영", vi.PathOf(f1) == @"X:\업무\견적\견적서_최종.xlsx");
+                vi.Write(v => IndexExplorer.Engine.EngineHost.Apply(v, work, rootF, "견적", Dir, IndexExplorer.Engine.NtfsVolume.REASON_RENAME_NEW_NAME));
+                Check("엔진: 폴더 이동 → 안의 파일 경로도 즉시", vi.PathOf(f1) == @"X:\견적\견적서_최종.xlsx", vi.PathOf(f1) ?? "");
+                vi.Write(v => IndexExplorer.Engine.EngineHost.Apply(v, work, users, "견적", Dir, IndexExplorer.Engine.NtfsVolume.REASON_RENAME_NEW_NAME));
+                vi.Write(v => IndexExplorer.Engine.EngineHost.Apply(v, win, rootF, "Windows", Dir, 0));
+                vi.Write(v => IndexExplorer.Engine.EngineHost.Apply(v, f3, work, "사진.png", 0x20, IndexExplorer.Engine.NtfsVolume.REASON_FILE_DELETE));
+                Check("엔진: 삭제 반영", vi.CountByKind(false)[7] == 0 && vi.Count == 5);
+                var hits = vi.Query(1, "최종", false, 100);
+                Check("엔진: 종류 + 이름 검색", hits.Count == 1 && hits[0].Path.EndsWith("견적서_최종.xlsx"));
+                vi.JournalId = 0xABC; vi.NextUsn = 12345;
+                var snapPath = Path.Combine(App.SelfTestOut!, "test.idx");
+                vi.Save(snapPath);
+                var vi2 = new IndexExplorer.Engine.VolumeIndex("X:");
+                Check("엔진: 목록 저장·복원 (재부팅 후 이어 읽기용)", vi2.Load(snapPath) && vi2.Count == 5 && vi2.JournalId == 0xABC && vi2.NextUsn == 12345
+                    && vi2.PathOf(f1) == @"X:\업무\견적\견적서_최종.xlsx");
+                // 대량: 50만 개 넣고 조회 속도
+                var big = new IndexExplorer.Engine.VolumeIndex("Y:");
+                var swE = Stopwatch.StartNew();
+                big.Write(v =>
+                {
+                    v.Upsert(10, 5, "data", Dir);
+                    for (ulong i = 0; i < 500_000; i++) v.Upsert(1000 + i, 10, $"file_{i}.{(i % 10 == 0 ? "xlsx" : "txt")}", 0x20);
+                });
+                var buildMs = swE.ElapsedMilliseconds;
+                swE.Restart();
+                var cnt = big.CountByKind(false);
+                var countMs = swE.ElapsedMilliseconds;
+                swE.Restart();
+                var q50 = big.Query(1, null, false, 100_000);
+                Check("엔진: 50만 개 — 담기·세기·엑셀 조회", cnt[1] == 50_000 && q50.Count == 50_000 && countMs < 500,
+                    $"담기 {buildMs}ms, 종류별 세기 {countMs}ms, 엑셀 5만 개 경로까지 {swE.ElapsedMilliseconds}ms, 메모리 약 {big.EstimatedBytes / (1024 * 1024)}MB");
+            }
+
+            // 27) 파일 종류 화면 (엔진 없이 = 색인한 폴더 안에서)
+            Navigate(new Location(LocKind.FileKind, 1));
+            await Settle(500);
+            Check("파일 종류: 엑셀 (엔진 없으면 색인한 폴더 안)", _loc.Kind == LocKind.FileKind && _items.Count > 0 && _items.All(i => i.Name.EndsWith(".xlsx") || i.Name.EndsWith(".csv")),
+                $"{_items.Count}개, 배지 {KindNode(1)?.Badge}");
+            Check("파일 종류: 트리 선택·제목", KindNode(1)?.IsSelected == true && _tab.Title == "엑셀");
+            Shot("20_파일종류_엑셀");
 
             // 20) 창 두 개: 한 창에서 복사 → 다른 창의 색인 폴더에 붙여넣기 = 연결 (복사본 안 생김)
             var w2 = App.OpenWindow(new Location(LocKind.IndexFolder, r.Id), this);

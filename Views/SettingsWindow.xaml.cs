@@ -1,4 +1,7 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Security.Principal;
+using IndexExplorer.Engine;
 using System.IO;
 using System.Windows;
 using IndexExplorer.Services;
@@ -20,6 +23,7 @@ public partial class SettingsWindow : Window
         _storage = settings.StorageRoot;
         RootList.ItemsSource = _roots;
         StorageText.Text = _storage;
+        UpdateEngineStatus();
         if (firstRun)
         {
             Title = "색인 탐색기 시작하기";
@@ -27,6 +31,43 @@ public partial class SettingsWindow : Window
             SaveBtn.Content = "시작하기";
             CancelBtn.Content = "기본값으로 시작";
         }
+    }
+
+    private void UpdateEngineStatus()
+    {
+        string s;
+        try { s = EngineInstaller.StatusText(); } catch { s = "확인 불가"; }
+        EngineStatus.Text = s;
+        var running = s == "실행 중";
+        EngineBadge.Background = (System.Windows.Media.Brush)FindResource(running ? "PinBadgeBgBrush" : "SidebarBrush");
+        EngineStatus.Foreground = (System.Windows.Media.Brush)FindResource(running ? "PinBadgeBrush" : "SecondaryBrush");
+        EngineInstallBtn.Content = s == "설치 안 됨" ? "설치" : "다시 설치";
+        EngineRemoveBtn.IsEnabled = s != "설치 안 됨";
+    }
+
+    /// <summary>같은 exe 를 관리자 권한으로 실행해 서비스를 설치·제거 (권한 확인 창 1회).</summary>
+    private void RunElevated(string args)
+    {
+        try
+        {
+            var p = Process.Start(new ProcessStartInfo(Environment.ProcessPath!, args) { UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden });
+            p?.WaitForExit(60000);
+        }
+        catch (System.ComponentModel.Win32Exception) { /* 권한 확인 창에서 취소 */ }
+        UpdateEngineStatus();
+    }
+
+    private void EngineInstall_Click(object sender, RoutedEventArgs e)
+    {
+        var sid = WindowsIdentity.GetCurrent().User?.Value ?? "";
+        RunElevated($"--install-service {sid}");
+    }
+
+    private void EngineRemove_Click(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show(this, "색인 엔진을 제거할까요?\n\n파일 종류 보기는 색인한 폴더 안에서만 동작하게 됩니다. 파일은 영향이 없습니다.",
+                "색인 엔진", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+        RunElevated("--uninstall-service");
     }
 
     private void AddRoot_Click(object sender, RoutedEventArgs e)

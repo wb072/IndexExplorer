@@ -8,13 +8,14 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using IndexExplorer.Engine;
 using IndexExplorer.Native;
 using IndexExplorer.Services;
 using IndexExplorer.ViewModels;
 
 namespace IndexExplorer.Views;
 
-public enum LocKind { IndexRoot, IndexFolder, Recent, Inbox, AllFiles, ThisPC, Dir, Search }
+public enum LocKind { IndexRoot, IndexFolder, Recent, Inbox, AllFiles, FileKind, ThisPC, Dir, Search }
 
 /// <summary>지금 보고 있는 곳.</summary>
 public sealed record Location(LocKind Kind, long FolderId = 0, string Path = "", string Query = "")
@@ -119,6 +120,7 @@ public partial class MainWindow : Window
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         RecentFiles.Current(); // 최근 문서를 미리 읽어 둔다 (처음 열 때 기다리지 않도록)
+        StartEnginePolling();
         if (App.IndexerStarted) { StartDirWatcher(); return; } // 두 번째 이후 창
         App.IndexerStarted = true;
         if (App.SelfTestOut != null)
@@ -193,6 +195,7 @@ public partial class MainWindow : Window
             ? []
             : AllNodes(_indexNodes).Where(n => n.IsExpanded && n.Kind == NodeKind.IndexFolder).Select(n => n.FolderId).ToHashSet();
         var rootExpanded = _indexRoot?.IsExpanded ?? true;
+        var kindsExpanded = _kindsNode?.IsExpanded ?? true;
 
         _indexRoot = new TreeNode { Kind = NodeKind.IndexRoot, Name = "색인", Icon = (ImageSource)FindResource("IconAppSmall"), IsExpanded = rootExpanded };
         AddFolderNodes(_indexRoot, null, expanded);
@@ -208,10 +211,12 @@ public partial class MainWindow : Window
             _indexNodes.Add(_recentNode);
             _indexNodes.Add(_inboxNode);
             _indexNodes.Add(_allNode);
+            _indexNodes.Add(_kindsNode = BuildKindsNode(kindsExpanded));
         }
         finally { _syncingTree = false; }
         _folderSignature = FolderSignature();
         UpdateBadges();
+        UpdateKindBadges();
     }
 
     private void AddFolderNodes(TreeNode parent, long? parentId, HashSet<long> expanded)
@@ -305,6 +310,7 @@ public partial class MainWindow : Window
                 LocKind.Recent => _recentNode,
                 LocKind.Inbox => _inboxNode,
                 LocKind.AllFiles => _allNode,
+                LocKind.FileKind => KindNode(_loc.FolderId),
                 LocKind.ThisPC => _pcNode,
                 LocKind.Dir => RevealPhysNode(_loc.Path),
                 _ => null,
@@ -319,7 +325,7 @@ public partial class MainWindow : Window
 
     private void BringNodeIntoView(TreeNode node)
     {
-        var tree = node.IsIndex || node.Kind is NodeKind.Recent or NodeKind.Inbox or NodeKind.AllFiles ? IndexTree : PhysTree;
+        var tree = node.IsIndex || node.Kind is NodeKind.Recent or NodeKind.Inbox or NodeKind.AllFiles or NodeKind.KindsRoot or NodeKind.FileKind ? IndexTree : PhysTree;
         var chain = node.Ancestors().Reverse().Append(node).ToList();
         ItemsControl parent = tree;
         foreach (var n in chain)
@@ -352,6 +358,13 @@ public partial class MainWindow : Window
     private void Tree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
         if (_syncingTree || e.NewValue is not TreeNode node || node == TreeNode.Placeholder || !node.IsSelected) return;
+        if (node.Kind == NodeKind.KindsRoot)
+        {
+            // "파일 종류"는 묶음 제목: 누르면 펼치기만
+            node.IsExpanded = !node.IsExpanded;
+            Dispatcher.BeginInvoke(SyncTreeSelection);
+            return;
+        }
         // 트리 항목이 처음 그려질 때도 이 이벤트가 오므로, 이미 보고 있는 곳이면 무시
         var target = LocationOf(node);
         if (_loc.Same(target)) return;
@@ -364,6 +377,7 @@ public partial class MainWindow : Window
         NodeKind.Recent => new Location(LocKind.Recent),
         NodeKind.Inbox => new Location(LocKind.Inbox),
         NodeKind.AllFiles => new Location(LocKind.AllFiles),
+        NodeKind.FileKind => new Location(LocKind.FileKind, n.FolderId),
         NodeKind.ThisPC => new Location(LocKind.ThisPC),
         NodeKind.Dir => new Location(LocKind.Dir, Path: n.Path),
         _ => new Location(LocKind.IndexRoot),
@@ -502,6 +516,7 @@ public partial class MainWindow : Window
                 n.Children.Add(TreeNode.Placeholder);
             }
         }
+        if (_loc.Kind == LocKind.FileKind) RequestKindItems(force: true);
         LoadItems(reset: false);
         _ = _indexer.FullScanAsync();
     }
@@ -601,6 +616,9 @@ public partial class MainWindow : Window
             case LocKind.AllFiles:
                 list.AddRange(_store.Files.Select(FileItem));
                 break;
+            case LocKind.FileKind:
+                BuildKindItems(list);
+                break;
             case LocKind.Search:
                 list.AddRange(_store.SearchFolders(_loc.Query).Select(f => FolderItem(f, withLocation: true)));
                 list.AddRange(_store.SearchFiles(_loc.Query).Take(5000).Select(FileItem));
@@ -699,8 +717,8 @@ public partial class MainWindow : Window
 
     private void UpdateColumns()
     {
-        var showLoc = _loc.Kind is LocKind.IndexFolder or LocKind.Recent or LocKind.Inbox or LocKind.AllFiles or LocKind.Search or LocKind.ThisPC;
-        var showIdx = _loc.Kind is LocKind.Dir or LocKind.Recent or LocKind.AllFiles or LocKind.Search;
+        var showLoc = _loc.Kind is LocKind.IndexFolder or LocKind.Recent or LocKind.Inbox or LocKind.AllFiles or LocKind.FileKind or LocKind.Search or LocKind.ThisPC;
+        var showIdx = _loc.Kind is LocKind.Dir or LocKind.Recent or LocKind.AllFiles or LocKind.FileKind or LocKind.Search;
         // 최근 문서에서는 날짜 열이 "마지막으로 쓴 때"
         _colInfo[_grid.Columns.First(col => _colInfo.TryGetValue(col, out var i) && i.key == "Modified")] = ("Modified", _loc.Kind == LocKind.Recent ? "최근 사용" : "수정한 날짜");
         _colInfo[_colLocation] = ("Location", _loc.Kind == LocKind.ThisPC ? "여유 공간" : "원본 위치");
@@ -738,6 +756,8 @@ public partial class MainWindow : Window
             LocKind.Inbox => ("모두 분류했습니다", "새로 생기는 파일은 여기에 먼저 모입니다."),
             LocKind.Search => ("검색 결과가 없습니다", "다른 단어로 찾아보세요. 띄어 쓴 단어는 모두 포함된 파일을 찾습니다."),
             LocKind.AllFiles => ("색인된 파일이 없습니다", "설정에서 색인할 폴더를 추가하세요."),
+            LocKind.FileKind => _engineUp ? (_kindLoading ? ("PC 전체에서 찾는 중…", "") : ("이 종류의 파일이 없습니다", ""))
+                : ("색인한 폴더에 이 종류의 파일이 없습니다", "PC 전체에서 찾으려면 설정에서 색인 엔진을 설치하세요."),
             _ => ("이 폴더는 비어 있습니다", ""),
         };
         EmptyTitle.Text = title;
@@ -947,6 +967,10 @@ public partial class MainWindow : Window
             case LocKind.Recent: Add("최근 문서", _loc); break;
             case LocKind.Inbox: Add("미분류 함", _loc); break;
             case LocKind.AllFiles: Add("모든 파일", _loc); break;
+            case LocKind.FileKind:
+                Add("파일 종류", _loc);
+                Add(FileKinds.ById((byte)_loc.FolderId)?.Name ?? "", _loc);
+                break;
             case LocKind.Search: Add($"‘{_loc.Query}’ 검색 결과", _loc); break;
             case LocKind.ThisPC: Add("내 PC", _loc); break;
             case LocKind.Dir:

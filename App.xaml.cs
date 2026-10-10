@@ -32,6 +32,8 @@ public partial class App : Application
     public static IndexStore Store { get; private set; } = null!;
     public static Indexer Indexer { get; private set; } = null!;
     public static bool IndexerStarted { get; set; }
+    /// <summary>엔진 서비스 접속 (없으면 null 응답 → 1.0 방식).</summary>
+    public static Engine.EngineClient Engine { get; } = new();
 
     // 탐색기처럼 한 프로그램에 창 여러 개: 이미 실행 중이면 그쪽에 새 창을 열게 하고 끝낸다
     private const string InstanceName = "IndexExplorer.SingleInstance";
@@ -55,6 +57,8 @@ public partial class App : Application
             return;
         }
 
+        // 자체 검증 중에는 실제 서비스에 붙지 않는다 (INDEXEXPLORER_SELFTEST_ENGINE=1 이면 실제 엔진으로 화면 확인)
+        Engine.Disabled = SelfTestOut != null && Environment.GetEnvironmentVariable("INDEXEXPLORER_SELFTEST_ENGINE") != "1";
         Settings = Settings.Load();
         Store = new IndexStore(Path.Combine(Settings.DataDir, "index.db"));
         Indexer = new Indexer(Store, Settings, Dispatcher);

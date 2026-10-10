@@ -11,11 +11,13 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <!-- 한 exe 가 화면 앱·엔진 서비스·설치기를 겸하므로 시작점을 직접 둔다 (Program.cs) -->
+    <StartupObject>IndexExplorer.Program</StartupObject>
     <AssemblyTitle>색인 탐색기</AssemblyTitle>
     <Product>색인 탐색기</Product>
     <Description>파일 위치와 상관없이 나만의 분류(색인)로 정리하는 탐색기</Description>
     <Copyright>© 2026</Copyright>
-    <Version>0.1.0</Version>
+    <Version>2.0.0</Version>
     <!-- 성능: 미리 컴파일(ReadyToRun)로 시작 시간 단축 -->
     <PublishReadyToRun>true</PublishReadyToRun>
     <TieredPGO>true</TieredPGO>
@@ -29,6 +31,7 @@
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.12" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
     <!-- 알려진 취약점이 고쳐진 SQLite 네이티브 라이브러리로 고정 -->
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.13" />

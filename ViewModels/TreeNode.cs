@@ -5,7 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace IndexExplorer.ViewModels;
 
-public enum NodeKind { IndexRoot, IndexFolder, Recent, Inbox, AllFiles, ThisPC, Dir }
+public enum NodeKind { IndexRoot, IndexFolder, Recent, Inbox, AllFiles, KindsRoot, FileKind, ThisPC, Dir }
 
 /// <summary>왼쪽 트리의 한 줄 (색인 폴더 또는 원본 폴더).</summary>
 public sealed partial class TreeNode : ObservableObject
