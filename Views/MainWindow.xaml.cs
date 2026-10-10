@@ -407,6 +407,7 @@ public partial class MainWindow : Window
         if (loc.IsPhysical) { _lastPhysLoc = loc; SetMode(true); }
         else if (loc.Kind != LocKind.Search) { _lastIndexLoc = loc; SetMode(false); }
 
+        _filters.Clear(); // 다른 곳으로 가면 필터는 풀린다 (탐색기와 같음)
         LoadItems(reset: true);
         if (selectPath != null) SelectPaths([selectPath]);
         UpdateCrumb();
@@ -649,6 +650,7 @@ public partial class MainWindow : Window
             // 다른 곳으로 이동: 컬렉션을 통째로 바꿔 수천 개도 한 번에 그린다
             _items = new ObservableCollection<ListItem>(list);
             _view = new ListCollectionView(_items) { CustomSort = new ItemComparer(_sortKey, _sortDesc) };
+            if (_filters.Count > 0) _view.Filter = PassesFilter;
             List.ItemsSource = _view;
             if (List.Items.Count > 0) List.ScrollIntoView(List.Items[0]);
         }
@@ -712,6 +714,14 @@ public partial class MainWindow : Window
 
     private void UpdateEmptyState(string? error)
     {
+        if (_items.Count > 0 && _view.Count == 0)
+        {
+            EmptyTitle.Text = "필터에 맞는 항목이 없습니다";
+            EmptyBody.Text = "열 제목 오른쪽 ▾ 에서 필터를 바꾸거나 지우세요.";
+            EmptyBody.Visibility = Visibility.Visible;
+            EmptyState.Visibility = Visibility.Visible;
+            return;
+        }
         if (_items.Count > 0) { EmptyState.Visibility = Visibility.Collapsed; return; }
         (string title, string body) = error != null ? ("폴더를 열 수 없습니다", error) : _loc.Kind switch
         {
@@ -732,7 +742,7 @@ public partial class MainWindow : Window
     private void UpdateStatus()
     {
         var sel = List.SelectedItems.Cast<ListItem>().ToList();
-        var text = $"항목 {_items.Count:N0}개";
+        var text = _filters.Count > 0 ? $"항목 {_items.Count:N0}개 중 {_view.Count:N0}개 표시 (필터)" : $"항목 {_items.Count:N0}개";
         if (sel.Count > 0)
         {
             text += $"     {sel.Count:N0}개 선택함";
@@ -815,11 +825,18 @@ public partial class MainWindow : Window
     private void UpdateSortHeaders()
     {
         foreach (var (col, (key, title)) in _colInfo)
-            col.Header = key == _sortKey ? $"{title}  {(_sortDesc ? "˅" : "˄")}" : title;
+            col.Header = new HeaderInfo(title, key == _sortKey ? (_sortDesc ? 2 : 1) : 0, _filters.ContainsKey(key));
     }
 
     private void Header_Click(object sender, RoutedEventArgs e)
     {
+        // 열 오른쪽 ▾ 버튼 = 필터, 나머지 = 정렬
+        if (e.OriginalSource is Button { Tag: "filter" } fb && FindAncestor<GridViewColumnHeader>(fb) is { Column: { } fcol })
+        {
+            OpenFilterMenu(fcol, fb);
+            e.Handled = true;
+            return;
+        }
         if (e.OriginalSource is GridViewColumnHeader { Column: { } col } && _colInfo.TryGetValue(col, out var info))
             SetSort(info.key);
     }

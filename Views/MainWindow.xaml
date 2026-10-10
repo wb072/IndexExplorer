@@ -170,7 +170,27 @@
             </DataTemplate.Triggers>
         </DataTemplate>
 
-        <GridView x:Key="DetailsView" x:Shared="False" AllowsColumnReorder="True">
+        <!-- 열 제목: 글자 + 가는 선으로 그린 정렬 화살표 -->
+        <DataTemplate x:Key="HeaderTemplate" DataType="{x:Type vm:HeaderInfo}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                <Path x:Name="Chev" Data="M0,4 L3.5,0.5 L7,4" Stroke="{StaticResource AccentBrush}" StrokeThickness="1.2" Opacity="0.85"
+                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                      Margin="7,1,0,0" VerticalAlignment="Center" Visibility="Collapsed" />
+            </StackPanel>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding Sort}" Value="1">
+                    <Setter TargetName="Chev" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Sort}" Value="2">
+                    <Setter TargetName="Chev" Property="Visibility" Value="Visible" />
+                    <Setter TargetName="Chev" Property="Data" Value="M0,0.5 L3.5,4 L7,0.5" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <GridView x:Key="DetailsView" x:Shared="False" AllowsColumnReorder="True" ColumnHeaderTemplate="{StaticResource HeaderTemplate}"
+                  ColumnHeaderContainerStyle="{StaticResource ColumnHeaderStyle}">
             <GridViewColumn Header="이름" Width="290" CellTemplate="{StaticResource NameCell}" />
             <GridViewColumn Header="수정한 날짜" Width="156">
                 <GridViewColumn.CellTemplate>

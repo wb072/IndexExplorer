@@ -308,6 +308,26 @@ public partial class MainWindow
             Check("최근 문서에서 나오면 원래 정렬로", _sortKey == "Name" && !_sortDesc);
             Shot("13_사이드바_툴바");
 
+            // 22) 열 필터 (탐색기와 같음)
+            Navigate(new Location(LocKind.Dir, Path: P("Downloads")));
+            await Settle(500);
+            var pngType = _items.First(i => i.Name.EndsWith(".png")).TypeName;
+            _filters["Type"] = [pngType];
+            ApplyFilter();
+            await Settle(300);
+            Check("유형 필터: 그림 파일만", _view.Count == 1, $"{_view.Count}개 표시 / 전체 {_items.Count}개");
+            Shot("14_필터");
+            _filters.Clear();
+            _filters["Name"] = ["A–H"];
+            ApplyFilter();
+            Check("이름 필터: A–H", _view.Count == 1 && ((ListItem)_view.GetItemAt(0)).Name.StartsWith("A"), $"{_view.Count}개");
+            _filters.Clear();
+            ApplyFilter();
+            Check("필터 지우면 전체", _view.Count == _items.Count);
+            var hdr = FindDescendant<GridViewColumnHeader>(List);
+            if (hdr != null)
+                _results.Add($"INFO  열 제목 위치: 목록 위에서 {hdr.TranslatePoint(new Point(0, 0), List).Y}px, 높이 {hdr.ActualHeight}px, 목록 위치 {List.TranslatePoint(new Point(0, 0), (UIElement)Content).Y}px");
+
             // 20) 창 두 개: 한 창에서 복사 → 다른 창의 색인 폴더에 붙여넣기 = 연결 (복사본 안 생김)
             var w2 = App.OpenWindow(new Location(LocKind.IndexFolder, r.Id), this);
             await Settle(900);
