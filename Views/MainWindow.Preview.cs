@@ -193,6 +193,13 @@ public partial class MainWindow
                 Link(_settings.StorageRoot, () => GoDirOrToast(_settings.StorageRoot));
                 Para("저장 위치를 지정하지 않은 색인 폴더에서 새로 만들거나 붙여넣은 파일은 이곳에 색인과 같은 폴더 구조로 저장됩니다.");
                 break;
+            case LocKind.Recent:
+                SetPreviewImage((ImageSource)FindResource("IconRecent"), true);
+                PvTitle.Text = "최근 문서";
+                PvSub.Text = $"파일 {_items.Count:N0}개";
+                Para("최근에 열었던 문서를 사용한 순서로 모았습니다. 어느 폴더에 있든, 어떤 프로그램으로 열었든 모두 보입니다.");
+                Para("자주 쓰는 문서는 왼쪽 색인 폴더로 끌어다 놓아 분류해 두세요.");
+                break;
             case LocKind.Inbox:
                 SetPreviewImage((ImageSource)FindResource("IconInbox"), true);
                 PvTitle.Text = "미분류 함";

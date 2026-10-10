@@ -272,14 +272,6 @@
         <Border Grid.Row="1" Grid.ColumnSpan="3" BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,0,1" Padding="10,0,12,6">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                    <Button x:Name="SortBtn" Style="{StaticResource ToolButtonB}" Click="SortMenu_Click" ToolTip="정렬 기준">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE8CB;" Style="{StaticResource Glyph}" FontSize="14" />
-                            <TextBlock Text="정렬" Margin="6,0,2,0" VerticalAlignment="Center" />
-                            <TextBlock Text="&#xE70D;" Style="{StaticResource Glyph}" FontSize="9" Foreground="{StaticResource SecondaryBrush}" />
-                        </StackPanel>
-                    </Button>
-                    <Rectangle Width="1" Height="18" Fill="{StaticResource HairlineBrush}" Margin="6,0" />
                     <ToggleButton x:Name="DetailsBtn" Style="{StaticResource ToolToggle}" Click="DetailsView_Click" ToolTip="자세히 (Ctrl+Shift+6)">
                         <TextBlock Text="&#xE8FD;" Style="{StaticResource Glyph}" FontSize="14" />
                     </ToggleButton>
@@ -289,7 +281,7 @@
                     <ToggleButton x:Name="PreviewBtn" Style="{StaticResource ToolToggle}" Click="PreviewToggle_Click" ToolTip="미리 보기 창 (Alt+P)">
                         <TextBlock Text="&#xE7B3;" Style="{StaticResource Glyph}" FontSize="14" />
                     </ToggleButton>
-                    <Rectangle Width="1" Height="18" Fill="{StaticResource HairlineBrush}" Margin="6,0" />
+                    <Rectangle Width="1" Height="18" Fill="{StaticResource HairlineBrush}" Margin="8,0" />
                     <Button Style="{StaticResource ToolButtonB}" Click="NewWindow_Click" ToolTip="새 창 (Ctrl+N)&#x0a;두 창을 나란히 두고 끌어다 놓거나 복사·붙여넣기">
                         <TextBlock Text="&#xE8A7;" Style="{StaticResource Glyph}" FontSize="14" />
                     </Button>
@@ -306,27 +298,35 @@
                             <TextBlock Text="&#xE70D;" Style="{StaticResource Glyph}" FontSize="9" Foreground="{StaticResource SecondaryBrush}" />
                         </StackPanel>
                     </Button>
-                    <Rectangle Width="1" Height="18" Fill="{StaticResource HairlineBrush}" Margin="6,0" />
-                    <Button x:Name="CutBtn" Style="{StaticResource ToolButtonB}" Click="Cut_Click" ToolTip="잘라내기 (Ctrl+X)">
-                        <TextBlock Text="&#xE8C6;" Style="{StaticResource Glyph}" />
+                    <Rectangle Width="1" Height="18" Fill="{StaticResource HairlineBrush}" Margin="8,0" />
+                    <Button x:Name="CutBtn" Style="{StaticResource IconTool}" Click="Cut_Click" ToolTip="잘라내기 (Ctrl+X)">
+                        <TextBlock Text="&#xE8C6;" Style="{StaticResource Glyph}" Foreground="#D9744A" />
                     </Button>
-                    <Button x:Name="CopyBtn" Style="{StaticResource ToolButtonB}" Click="Copy_Click" ToolTip="복사 (Ctrl+C)">
-                        <TextBlock Text="&#xE8C8;" Style="{StaticResource Glyph}" />
+                    <Button x:Name="CopyBtn" Style="{StaticResource IconTool}" Click="Copy_Click" ToolTip="복사 (Ctrl+C)">
+                        <TextBlock Text="&#xE8C8;" Style="{StaticResource Glyph}" Foreground="#3B82D6" />
                     </Button>
-                    <Button x:Name="PasteBtn" Style="{StaticResource ToolButtonB}" Click="Paste_Click" ToolTip="붙여넣기 (Ctrl+V)">
-                        <TextBlock Text="&#xE77F;" Style="{StaticResource Glyph}" />
+                    <Button x:Name="PasteBtn" Style="{StaticResource IconTool}" Click="Paste_Click" ToolTip="붙여넣기 (Ctrl+V)">
+                        <TextBlock Text="&#xE77F;" Style="{StaticResource Glyph}" Foreground="#1F9D78" />
                     </Button>
-                    <Button x:Name="RenameBtn" Style="{StaticResource ToolButtonB}" Click="Rename_Click" ToolTip="이름 바꾸기 (F2)">
-                        <TextBlock Text="&#xE8AC;" Style="{StaticResource Glyph}" />
+                    <Button x:Name="RenameBtn" Style="{StaticResource IconTool}" Click="Rename_Click" ToolTip="이름 바꾸기 (F2)">
+                        <TextBlock Text="&#xE8AC;" Style="{StaticResource Glyph}" Foreground="#7F77DD" />
                     </Button>
-                    <Button x:Name="DeleteBtn" Style="{StaticResource ToolButtonB}" Click="Delete_Click" ToolTip="삭제 (Delete)">
-                        <TextBlock Text="&#xE74D;" Style="{StaticResource Glyph}" />
+                    <Button x:Name="DeleteBtn" Style="{StaticResource IconTool}" Click="Delete_Click" ToolTip="삭제 (Delete)">
+                        <TextBlock Text="&#xE74D;" Style="{StaticResource Glyph}" Foreground="#E0565B" />
                     </Button>
-                    <Rectangle Width="1" Height="18" Fill="{StaticResource HairlineBrush}" Margin="6,0" />
+                    <Rectangle Width="1" Height="18" Fill="{StaticResource HairlineBrush}" Margin="8,0" />
                     <Button x:Name="AddIndexBtn" Style="{StaticResource ToolButtonB}" Click="AddToIndexMenu_Click" ToolTip="선택한 파일을 색인 폴더에 연결 (파일은 옮기지 않음)">
                         <StackPanel Orientation="Horizontal">
                             <Image Source="{StaticResource IconIndexRoot}" Width="14" Height="14" />
                             <TextBlock Text="색인에 추가" Margin="7,0,3,0" VerticalAlignment="Center" />
+                            <TextBlock Text="&#xE70D;" Style="{StaticResource Glyph}" FontSize="9" Foreground="{StaticResource SecondaryBrush}" />
+                        </StackPanel>
+                    </Button>
+                    <Rectangle Width="1" Height="18" Fill="{StaticResource HairlineBrush}" Margin="8,0" />
+                    <Button x:Name="SortBtn" Style="{StaticResource ToolButtonB}" Click="SortMenu_Click" ToolTip="정렬 기준">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE8CB;" Style="{StaticResource Glyph}" FontSize="14" />
+                            <TextBlock Text="정렬" Margin="6,0,2,0" VerticalAlignment="Center" />
                             <TextBlock Text="&#xE70D;" Style="{StaticResource Glyph}" FontSize="9" Foreground="{StaticResource SecondaryBrush}" />
                         </StackPanel>
                     </Button>
@@ -335,19 +335,37 @@
         </Border>
 
         <!-- ===== 3행 왼쪽: 사이드바 ===== -->
-        <Border Grid.Row="2" Grid.RowSpan="2" Grid.Column="0" Background="{StaticResource SidebarBrush}"
+        <Border Grid.Row="2" Grid.RowSpan="2" Grid.Column="0" Background="{StaticResource CanvasBrush}"
                 BorderBrush="{StaticResource HairlineBrush}" BorderThickness="0,0,1,0">
             <DockPanel>
-                <Border DockPanel.Dock="Top" Margin="12,10,12,0" Background="#E6E6EA" CornerRadius="8" Padding="2">
+                <!-- 색인 | 원본 스위치: 흰 알약이 미끄러지듯 옮겨 가는 세그먼트 -->
+                <Grid x:Name="ModeTrack" DockPanel.Dock="Top" Margin="12,12,12,10" Height="36" SizeChanged="ModeTrack_SizeChanged">
+                    <Border Background="#F0F0F3" CornerRadius="18" />
+                    <Border x:Name="ModeThumb" HorizontalAlignment="Left" Margin="3" CornerRadius="15" Background="White">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="8" ShadowDepth="1" Direction="270" Opacity="0.13" Color="#000000" />
+                        </Border.Effect>
+                        <Border.RenderTransform>
+                            <TranslateTransform x:Name="ModeThumbX" />
+                        </Border.RenderTransform>
+                    </Border>
                     <UniformGrid Columns="2">
                         <RadioButton x:Name="ModeIndex" Style="{StaticResource Segment}" GroupName="Mode" IsChecked="True" Checked="Mode_Checked"
-                                     ToolTip="내가 정한 분류로 보기 (Ctrl+1)">색인</RadioButton>
+                                     ToolTip="색인 · 찾기 위한 목차, 파일은 제자리에 (Ctrl+1)">
+                            <StackPanel Orientation="Horizontal">
+                                <Image Source="{StaticResource IconIndexRoot}" Width="15" Height="15" Margin="0,0,7,0" />
+                                <TextBlock Text="색인" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
                         <RadioButton x:Name="ModePhys" Style="{StaticResource Segment}" GroupName="Mode" Checked="Mode_Checked"
-                                     ToolTip="디스크의 실제 위치로 보기 (Ctrl+2)">원본</RadioButton>
+                                     ToolTip="원본 · 디스크의 실제 파일 위치 (Ctrl+2)">
+                            <StackPanel Orientation="Horizontal">
+                                <Image Source="{StaticResource IconDisk}" Width="15" Height="15" Margin="0,0,7,0" />
+                                <TextBlock Text="원본" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
                     </UniformGrid>
-                </Border>
-                <TextBlock x:Name="ModeCaption" DockPanel.Dock="Top" Margin="16,6,12,6" FontSize="11.5" Foreground="{StaticResource MutedBrush}"
-                           Text="찾기 위한 목차 · 파일은 제자리에" />
+                </Grid>
                 <Grid>
                     <TreeView x:Name="IndexTree" Background="Transparent" BorderThickness="0" Padding="6,0,8,8"
                               ScrollViewer.HorizontalScrollBarVisibility="Disabled"

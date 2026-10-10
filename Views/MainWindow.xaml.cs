@@ -14,7 +14,7 @@ using IndexExplorer.ViewModels;
 
 namespace IndexExplorer.Views;
 
-public enum LocKind { IndexRoot, IndexFolder, Inbox, AllFiles, ThisPC, Dir, Search }
+public enum LocKind { IndexRoot, IndexFolder, Recent, Inbox, AllFiles, ThisPC, Dir, Search }
 
 /// <summary>지금 보고 있는 곳.</summary>
 public sealed record Location(LocKind Kind, long FolderId = 0, string Path = "", string Query = "")
@@ -34,7 +34,7 @@ public partial class MainWindow : Window
 
     private readonly ObservableCollection<TreeNode> _indexNodes = [];
     private readonly ObservableCollection<TreeNode> _physNodes = [];
-    private TreeNode _indexRoot = null!, _inboxNode = null!, _allNode = null!, _pcNode = null!;
+    private TreeNode _indexRoot = null!, _recentNode = null!, _inboxNode = null!, _allNode = null!, _pcNode = null!;
 
     private GridView _grid = null!;
     private GridViewColumn _colLocation = null!, _colIndex = null!;
@@ -112,6 +112,7 @@ public partial class MainWindow : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        RecentFiles.Current(); // 최근 문서를 미리 읽어 둔다 (처음 열 때 기다리지 않도록)
         if (App.IndexerStarted) { StartDirWatcher(); return; } // 두 번째 이후 창
         App.IndexerStarted = true;
         if (App.SelfTestOut != null)
@@ -189,6 +190,7 @@ public partial class MainWindow : Window
 
         _indexRoot = new TreeNode { Kind = NodeKind.IndexRoot, Name = "색인", Icon = (ImageSource)FindResource("IconIndexRoot"), IsExpanded = rootExpanded };
         AddFolderNodes(_indexRoot, null, expanded);
+        _recentNode = new TreeNode { Kind = NodeKind.Recent, Name = "최근 문서", Icon = (ImageSource)FindResource("IconRecent") };
         _inboxNode = new TreeNode { Kind = NodeKind.Inbox, Name = "미분류 함", Icon = (ImageSource)FindResource("IconInbox") };
         _allNode = new TreeNode { Kind = NodeKind.AllFiles, Name = "모든 파일", Icon = (ImageSource)FindResource("IconAllFiles") };
 
@@ -197,6 +199,7 @@ public partial class MainWindow : Window
         {
             _indexNodes.Clear();
             _indexNodes.Add(_indexRoot);
+            _indexNodes.Add(_recentNode);
             _indexNodes.Add(_inboxNode);
             _indexNodes.Add(_allNode);
         }
@@ -293,6 +296,7 @@ public partial class MainWindow : Window
             {
                 LocKind.IndexRoot => _indexRoot,
                 LocKind.IndexFolder => FindIndexNode(_loc.FolderId),
+                LocKind.Recent => _recentNode,
                 LocKind.Inbox => _inboxNode,
                 LocKind.AllFiles => _allNode,
                 LocKind.ThisPC => _pcNode,
@@ -309,7 +313,7 @@ public partial class MainWindow : Window
 
     private void BringNodeIntoView(TreeNode node)
     {
-        var tree = node.IsIndex || node.Kind is NodeKind.Inbox or NodeKind.AllFiles ? IndexTree : PhysTree;
+        var tree = node.IsIndex || node.Kind is NodeKind.Recent or NodeKind.Inbox or NodeKind.AllFiles ? IndexTree : PhysTree;
         var chain = node.Ancestors().Reverse().Append(node).ToList();
         ItemsControl parent = tree;
         foreach (var n in chain)
@@ -351,6 +355,7 @@ public partial class MainWindow : Window
     private static Location LocationOf(TreeNode n) => n.Kind switch
     {
         NodeKind.IndexFolder => new Location(LocKind.IndexFolder, n.FolderId),
+        NodeKind.Recent => new Location(LocKind.Recent),
         NodeKind.Inbox => new Location(LocKind.Inbox),
         NodeKind.AllFiles => new Location(LocKind.AllFiles),
         NodeKind.ThisPC => new Location(LocKind.ThisPC),
@@ -369,7 +374,7 @@ public partial class MainWindow : Window
             ModePhys.IsChecked = physical;
             IndexTree.Visibility = physical ? Visibility.Collapsed : Visibility.Visible;
             PhysTree.Visibility = physical ? Visibility.Visible : Visibility.Collapsed;
-            ModeCaption.Text = physical ? "디스크의 실제 파일 위치" : "찾기 위한 목차 · 파일은 제자리에";
+            MoveModeThumb(physical);
         }
         finally { _settingMode = false; }
     }
@@ -395,6 +400,9 @@ public partial class MainWindow : Window
             _beforeSearch = null;
             SetSearchText("");
         }
+        // 최근 문서는 최근 사용 순이 기본, 나갈 때 원래 정렬로
+        if (loc.Kind == LocKind.Recent && _loc.Kind != LocKind.Recent) { _sortBeforeRecent = (_sortKey, _sortDesc); SetSort("Modified", true); }
+        else if (loc.Kind != LocKind.Recent && _loc.Kind == LocKind.Recent && _sortBeforeRecent is { } prev) { SetSort(prev.key, prev.desc); _sortBeforeRecent = null; }
         _loc = loc;
         if (loc.IsPhysical) { _lastPhysLoc = loc; SetMode(true); }
         else if (loc.Kind != LocKind.Search) { _lastIndexLoc = loc; SetMode(false); }
@@ -406,6 +414,23 @@ public partial class MainWindow : Window
         UpdateNavButtons();
         StartDirWatcher();
     }
+
+    private (string key, bool desc)? _sortBeforeRecent;
+
+    /// <summary>색인/원본 스위치의 흰 알약을 부드럽게 옮긴다.</summary>
+    private void MoveModeThumb(bool physical, bool animate = true)
+    {
+        var w = (ModeTrack.ActualWidth - 6) / 2;
+        if (w <= 0) return;
+        ModeThumb.Width = w;
+        var to = physical ? w : 0;
+        if (!animate) { ModeThumbX.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, null); ModeThumbX.X = to; return; }
+        ModeThumbX.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty,
+            new System.Windows.Media.Animation.DoubleAnimation(to, TimeSpan.FromMilliseconds(220))
+            { EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut } });
+    }
+
+    private void ModeTrack_SizeChanged(object sender, SizeChangedEventArgs e) => MoveModeThumb(ModePhys.IsChecked == true, animate: false);
 
     private void UpdateNavButtons()
     {
@@ -548,6 +573,20 @@ public partial class MainWindow : Window
                 list.AddRange(_store.Children(_loc.FolderId).Select(f => FolderItem(f)));
                 list.AddRange(_store.FilesIn(_loc.FolderId).Select(FileItem));
                 break;
+            case LocKind.Recent:
+                foreach (var r in RecentFiles.Current(() => { if (_loc.Kind == LocKind.Recent) LoadItems(reset: false); }) ?? [])
+                {
+                    var rec = _store.ByPath(r.Path);
+                    long? size = null;
+                    try { size = new FileInfo(r.Path).Length; } catch { }
+                    list.Add(new ListItem
+                    {
+                        Kind = ItemKind.File, Path = r.Path, Name = Path.GetFileName(r.Path), Record = rec,
+                        Modified = r.UsedUtc, Size = size, TypeName = ShellImages.TypeName(r.Path, false),
+                        Location = PathUtil.Dir(r.Path), IndexText = rec != null ? IndexNames(rec) : "",
+                    });
+                }
+                break;
             case LocKind.Inbox:
                 list.AddRange(_store.Unclassified().Select(FileItem));
                 break;
@@ -651,8 +690,10 @@ public partial class MainWindow : Window
 
     private void UpdateColumns()
     {
-        var showLoc = _loc.Kind is LocKind.IndexFolder or LocKind.Inbox or LocKind.AllFiles or LocKind.Search or LocKind.ThisPC;
-        var showIdx = _loc.Kind is LocKind.Dir or LocKind.AllFiles or LocKind.Search;
+        var showLoc = _loc.Kind is LocKind.IndexFolder or LocKind.Recent or LocKind.Inbox or LocKind.AllFiles or LocKind.Search or LocKind.ThisPC;
+        var showIdx = _loc.Kind is LocKind.Dir or LocKind.Recent or LocKind.AllFiles or LocKind.Search;
+        // 최근 문서에서는 날짜 열이 "마지막으로 쓴 때"
+        _colInfo[_grid.Columns.First(col => _colInfo.TryGetValue(col, out var i) && i.key == "Modified")] = ("Modified", _loc.Kind == LocKind.Recent ? "최근 사용" : "수정한 날짜");
         _colInfo[_colLocation] = ("Location", _loc.Kind == LocKind.ThisPC ? "여유 공간" : "원본 위치");
         // 이 앱의 핵심 정보(원본 위치·색인)는 이름 바로 옆에
         SetColumn(_colIndex, false, 0);
@@ -676,6 +717,7 @@ public partial class MainWindow : Window
         {
             LocKind.IndexRoot => ("첫 색인 폴더를 만들어 보세요", "새로 만들기 › 폴더 (Ctrl+Shift+N)\n업무·고객·프로젝트처럼 찾을 때 떠올리는 이름으로 만드세요."),
             LocKind.IndexFolder => ("이 색인은 비어 있습니다", "원본이나 미분류 함에서 파일을 끌어다 놓으면 연결됩니다.\n파일은 원래 자리에 그대로 있습니다."),
+            LocKind.Recent => RecentFiles.IsLoading ? ("최근 문서를 불러오는 중…", "") : ("최근에 연 문서가 없습니다", "문서를 열면 여기에 최근 순서로 모입니다."),
             LocKind.Inbox => ("모두 분류했습니다", "새로 생기는 파일은 여기에 먼저 모입니다."),
             LocKind.Search => ("검색 결과가 없습니다", "다른 단어로 찾아보세요. 띄어 쓴 단어는 모두 포함된 파일을 찾습니다."),
             LocKind.AllFiles => ("색인된 파일이 없습니다", "설정에서 색인할 폴더를 추가하세요."),
@@ -878,6 +920,7 @@ public partial class MainWindow : Window
                 Add("색인", new Location(LocKind.IndexRoot));
                 foreach (var f in _store.Chain(_loc.FolderId)) Add(f.Name, new Location(LocKind.IndexFolder, f.Id));
                 break;
+            case LocKind.Recent: Add("최근 문서", _loc); break;
             case LocKind.Inbox: Add("미분류 함", _loc); break;
             case LocKind.AllFiles: Add("모든 파일", _loc); break;
             case LocKind.Search: Add($"‘{_loc.Query}’ 검색 결과", _loc); break;

@@ -294,6 +294,20 @@ public partial class MainWindow
             else Check("큰 아이콘 보기 칸 찾기", false);
             SetViewMode(false);
 
+            // 21) 최근 문서 (윈도우 최근 항목)
+            var sw2 = Stopwatch.StartNew();
+            Navigate(new Location(LocKind.Recent));
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            sw2.Stop();
+            await WaitUntil(() => !RecentFiles.IsLoading, 15000);
+            await Settle(400);
+            Check("최근 문서 열기 (화면 멈춤 없이)", _loc.Kind == LocKind.Recent && _recentNode.IsSelected && sw2.ElapsedMilliseconds < 1000, $"{_items.Count}개, {sw2.ElapsedMilliseconds}ms");
+            Shot("12_최근문서");
+            Navigate(new Location(LocKind.IndexFolder, q.Id));
+            await Settle(400);
+            Check("최근 문서에서 나오면 원래 정렬로", _sortKey == "Name" && !_sortDesc);
+            Shot("13_사이드바_툴바");
+
             // 20) 창 두 개: 한 창에서 복사 → 다른 창의 색인 폴더에 붙여넣기 = 연결 (복사본 안 생김)
             var w2 = App.OpenWindow(new Location(LocKind.IndexFolder, r.Id), this);
             await Settle(900);
