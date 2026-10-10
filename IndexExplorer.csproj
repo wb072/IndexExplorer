@@ -10,6 +10,7 @@
     <NoWarn>$(NoWarn);WPF0001;CA1416</NoWarn>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <AssemblyTitle>색인 탐색기</AssemblyTitle>
     <Product>색인 탐색기</Product>
     <Description>파일 위치와 상관없이 나만의 분류(색인)로 정리하는 탐색기</Description>
@@ -20,6 +21,11 @@
     <TieredPGO>true</TieredPGO>
     <ServerGarbageCollector>false</ServerGarbageCollector>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 앱 아이콘 (Assets\make-icon.ps1 로 AppIcon.xaml 에서 만든다) -->
+    <Resource Include="Assets\app.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />

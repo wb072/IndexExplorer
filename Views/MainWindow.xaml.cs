@@ -86,6 +86,7 @@ public partial class MainWindow : Window
     {
         base.OnSourceInitialized(e);
         ShellImages.Scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
+        ModePhysIcon.Source = ShellImages.Icon(Path.GetTempPath(), true); // 원본 = 윈도우 탐색기의 노란 폴더
         if (!KeepPosition) RestoreBounds_();
         else SidebarCol.Width = new GridLength(Math.Clamp(_settings.SidebarWidth, 170, 480));
 

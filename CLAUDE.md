@@ -37,6 +37,10 @@
 - **툴바**: 편집 아이콘(잘라내기·복사·붙여넣기·이름 바꾸기·삭제)에 옅은 색을 넣고 간격을 넓혔다. 정렬 버튼은 왼쪽 묶음에 둔다.
 - **끌어서 여러 개 선택(범위 선택)**: 빈 곳, 또는 자세히 보기에서 이름 글자 밖에서 끌면 시작한다. Ctrl을 누르면 기존 선택에 더한다. 자동 스크롤을 지원하고, 자세히 보기는 가상화 목록이라 시작점을 "줄 번호"로 기억한다(`MainWindow.Marquee.cs`).
 
+## 앱 아이콘
+- "엄지 색인": 보라 폴더 + 오른쪽 색인 탭 세 개 + 목차 줄. 벡터 원본은 `Assets/AppIcon.xaml`(`IconApp`)이고, `Assets/make-icon.ps1`로 `app.ico`(16~256px)를 만든다. 색인 스위치에는 이 아이콘을, 원본 스위치에는 윈도우의 노란 폴더 아이콘을 쓴다.
+- 리소스를 새로 추가했는데 "리소스가 없습니다" 오류가 나면 `dotnet build --no-incremental`로 다시 빌드한다.
+
 ## 구조
 - `Services/IndexStore.cs`: SQLite(`%AppData%\IndexExplorer\index.db`)와 메모리 캐시. 색인 폴더, 파일, 연결을 관리한다.
 - `Services/Indexer.cs`: 감시 폴더 전체 검사와 FileSystemWatcher 증분 검사. 대량 변경은 상위 폴더 단위로 묶어 처리한다.

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:IndexExplorer.ViewModels"
         xmlns:local="clr-namespace:IndexExplorer.Views"
-        Title="색인 탐색기" Width="1180" Height="740" MinWidth="760" MinHeight="460"
+        Title="색인 탐색기" Icon="/Assets/app.ico" Width="1180" Height="740" MinWidth="760" MinHeight="460"
         FontFamily="{StaticResource AppFont}" FontSize="13" Foreground="{StaticResource InkBrush}"
         Background="{StaticResource CanvasBrush}" UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display"
@@ -473,14 +473,14 @@
                         <RadioButton x:Name="ModeIndex" Style="{StaticResource Segment}" GroupName="Mode" IsChecked="True" Checked="Mode_Checked"
                                      ToolTip="색인 · 찾기 위한 목차, 파일은 제자리에 (Ctrl+1)">
                             <StackPanel Orientation="Horizontal">
-                                <Image Source="{StaticResource IconIndexRoot}" Width="15" Height="15" Margin="0,0,7,0" />
+                                <Image Source="{StaticResource IconApp}" Width="17" Height="17" Margin="0,0,7,0" RenderOptions.BitmapScalingMode="HighQuality" />
                                 <TextBlock Text="색인" VerticalAlignment="Center" />
                             </StackPanel>
                         </RadioButton>
                         <RadioButton x:Name="ModePhys" Style="{StaticResource Segment}" GroupName="Mode" Checked="Mode_Checked"
                                      ToolTip="원본 · 디스크의 실제 파일 위치 (Ctrl+2)">
                             <StackPanel Orientation="Horizontal">
-                                <Image Source="{StaticResource IconDisk}" Width="15" Height="15" Margin="0,0,7,0" />
+                                <Image x:Name="ModePhysIcon" Width="16" Height="16" Margin="0,0,7,0" RenderOptions.BitmapScalingMode="HighQuality" />
                                 <TextBlock Text="원본" VerticalAlignment="Center" />
                             </StackPanel>
                         </RadioButton>
