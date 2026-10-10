@@ -73,6 +73,21 @@ public partial class MainWindow
         var S = _settings.StorageRoot;
         try
         {
+            // 0) 아이콘 크기별 선명도 비교용 (윈도우 아이콘은 16·32·48·256 크기를 갖고 있다)
+            var bat = Path.Combine(App.SelfTestOut!, "sample.bat");
+            File.WriteAllText(bat, "@echo off");
+            foreach (var sz in new[] { 48, 64, 96 })
+            {
+                if (ShellImages.Icon(bat, false, sz) is BitmapSource bs)
+                {
+                    var e0 = new PngBitmapEncoder();
+                    e0.Frames.Add(BitmapFrame.Create(bs));
+                    using var fs0 = File.Create(Path.Combine(App.SelfTestOut!, $"icon_bat_{sz}.png"));
+                    e0.Save(fs0);
+                    _results.Add($"INFO  bat 아이콘 {sz} 요청 → {bs.PixelWidth}x{bs.PixelHeight}px, 배율 {ShellImages.Scale}");
+                }
+            }
+
             // 1) 초기 색인
             await WaitUntil(() => _store.FileCount >= 11 && !_indexer.IsScanning, 15000);
             Check("초기 색인: 감시 폴더의 파일 11개", _store.FileCount == 11, $"실제 {_store.FileCount}개");

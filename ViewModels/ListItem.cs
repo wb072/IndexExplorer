@@ -65,10 +65,11 @@ public sealed partial class ListItem : ObservableObject
     };
 
     /// <summary>
-    /// 큰 아이콘 보기의 그림 크기. 화면에 그릴 크기 그대로(배율 반영 픽셀) 받아 와서 1:1 로 그려야 또렷하다
-    /// (작게 받아 키우거나 크게 받아 줄이면 흐려진다).
+    /// 큰 아이콘 보기의 그림 크기. 윈도우 아이콘은 16·32·48·256px 전용 그림을 갖고 있어서
+    /// 48px 은 전용 그림이 그대로 나와 또렷하다(탐색기와 같음). 64·96px 은 256px 그림을 줄인 것이라 흐리고 바래 보인다.
+    /// 받은 크기 그대로 1:1 로 그린다.
     /// </summary>
-    public const int TileImageSize = 64;
+    public const int TileImageSize = 48;
 
     private ImageSource? _bigIcon;
     public ImageSource? BigIcon => _bigIcon ??= Kind switch
