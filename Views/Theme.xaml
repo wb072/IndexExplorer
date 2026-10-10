@@ -120,13 +120,13 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#08000000" />
+                            <Setter TargetName="Bd" Property="Background" Value="#06000000" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#10000000" />
+                            <Setter TargetName="Bd" Property="Background" Value="#0B000000" />
                         </Trigger>
                         <Trigger Property="ToggleButton.IsChecked" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#10000000" />
+                            <Setter TargetName="Bd" Property="Background" Value="#0B000000" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.35" />
@@ -143,6 +143,10 @@
         <Setter Property="Margin" Value="2,0" />
     </Style>
     <Style x:Key="ToolToggle" TargetType="ToggleButton" BasedOn="{StaticResource ToolButton}" />
+    <Style x:Key="IconToggle" TargetType="ToggleButton" BasedOn="{StaticResource ToolButton}">
+        <Setter Property="MinWidth" Value="34" />
+        <Setter Property="Margin" Value="2,0" />
+    </Style>
 
     <Style x:Key="Glyph" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource IconFont}" />
@@ -384,7 +388,7 @@
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#08000000" />
+                            <Setter TargetName="Bd" Property="Background" Value="#06000000" />
                         </Trigger>
                         <Trigger Property="Role" Value="Padding">
                             <Setter TargetName="Bd" Property="Padding" Value="0" />
