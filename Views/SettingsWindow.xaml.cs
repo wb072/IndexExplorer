@@ -56,8 +56,9 @@ public partial class SettingsWindow : Window
         Width = Math.Min(Width, SystemParameters.WorkArea.Width - 40);
         ShowStorage();
         var ver = typeof(App).Assembly.GetName().Version;
-        var built = File.GetLastWriteTime(typeof(App).Assembly.Location);
-        VersionText.Text = $"버전 {ver?.Major}.{ver?.Minor} · {built:yyyy-MM-dd} 빌드";
+        // 단일 exe 로 묶으면 Assembly.Location 이 비어 있으므로 실행 파일 경로로 빌드 날짜를 읽는다
+        var exe = Environment.ProcessPath;
+        VersionText.Text = $"버전 {ver?.Major}.{ver?.Minor}" + (File.Exists(exe) ? $" · {File.GetLastWriteTime(exe):yyyy-MM-dd} 빌드" : "");
         DataText.Text = Settings.DataDir;
         UpdateEngineStatus();
         if (firstRun)
