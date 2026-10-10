@@ -267,7 +267,7 @@ public partial class MainWindow
             sw.Restart();
             Navigate(new Location(LocKind.AllFiles));
             await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-            Check("모든 파일 5,000여 개 목록 표시", sw.ElapsedMilliseconds < 1500 && _items.Count >= 5000, $"{sw.ElapsedMilliseconds}ms");
+            Check("모든 파일 5,000여 개 목록 표시", sw.ElapsedMilliseconds < 1500 && _items.Count >= 5000, $"{sw.ElapsedMilliseconds}ms, {_items.Count:N0}개 / 색인 {_store.FileCount:N0}개");
             sw.Restart();
             SetSearchText("자료 0999");
             RunSearch();
