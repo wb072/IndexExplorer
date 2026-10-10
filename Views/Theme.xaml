@@ -18,11 +18,17 @@
     <SolidColorBrush x:Key="SidebarBrush" Color="#F5F5F7" />
     <SolidColorBrush x:Key="FieldBrush" Color="#EFEFF2" />
     <SolidColorBrush x:Key="HairlineBrush" Color="#E3E3E8" />
-    <SolidColorBrush x:Key="HoverBrush" Color="#0D000000" />
+    <SolidColorBrush x:Key="HoverBrush" Color="#F0F6FE" />
     <SolidColorBrush x:Key="PressBrush" Color="#17000000" />
-    <SolidColorBrush x:Key="SelectBrush" Color="#D6E7FB" />
-    <SolidColorBrush x:Key="SelectInactiveBrush" Color="#E6E6EB" />
-    <SolidColorBrush x:Key="SidebarSelectBrush" Color="#EAEAEF" />
+    <!-- 선택·마우스 올림은 파란 계열 (회색은 칙칙하다는 피드백) -->
+    <SolidColorBrush x:Key="RowHoverBrush" Color="#F0F6FE" />
+    <!-- 모든 마우스 올림은 같은 파란색 하나, 누름·켜짐은 한 단계 진하게 -->
+    <SolidColorBrush x:Key="PressBlueBrush" Color="#E2EEFC" />
+    <SolidColorBrush x:Key="SelectBrush" Color="#DDEBFC" />
+    <SolidColorBrush x:Key="SelectBorderBrush" Color="#8FBDF0" />
+    <SolidColorBrush x:Key="SelectInactiveBrush" Color="#E9F2FD" />
+    <SolidColorBrush x:Key="SelectInactiveBorderBrush" Color="#C4DCF6" />
+    <SolidColorBrush x:Key="SidebarSelectBrush" Color="#E3EEFC" />
     <SolidColorBrush x:Key="DropBrush" Color="#CFE3FA" />
     <SolidColorBrush x:Key="GuideBrush" Color="#DCDCE1" />
     <SolidColorBrush x:Key="GuideActiveBrush" Color="#86B5EA" />
@@ -120,13 +126,13 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#06000000" />
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource RowHoverBrush}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#0B000000" />
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource PressBlueBrush}" />
                         </Trigger>
                         <Trigger Property="ToggleButton.IsChecked" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#0B000000" />
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource PressBlueBrush}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.35" />
@@ -193,10 +199,10 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#F4F4F6" />
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource RowHoverBrush}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#EBEBEF" />
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource PressBlueBrush}" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -293,7 +299,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="TreeViewItem">
                     <StackPanel>
-                        <Border x:Name="Bd" CornerRadius="6" Height="28" Background="Transparent" Padding="0,0,8,0" Margin="0,0,0,1">
+                        <Border x:Name="Bd" CornerRadius="6" Height="28" Background="Transparent" Padding="0,0,8,0" Margin="0,0,0,1" BorderThickness="1" BorderBrush="Transparent">
                             <DockPanel>
                                 <ToggleButton x:Name="Expander" Style="{StaticResource ExpanderToggle}" DockPanel.Dock="Left"
                                               IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}" />
@@ -312,10 +318,11 @@
                             <Setter TargetName="Expander" Property="Visibility" Value="Hidden" />
                         </Trigger>
                         <Trigger SourceName="Bd" Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource HoverBrush}" />
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource RowHoverBrush}" />
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{StaticResource SidebarSelectBrush}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource SelectInactiveBorderBrush}" />
                         </Trigger>
                         <!-- 평소엔 선 없음, 마우스를 올린 항목과 같은 단계(형제들)의 선만 옅게 -->
                         <DataTrigger Binding="{Binding IsOnPath}" Value="True">
@@ -396,7 +403,7 @@
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="B" Property="Background" Value="#D9E9FB" />
+                                                    <Setter TargetName="B" Property="Background" Value="{StaticResource PressBlueBrush}" />
                                                     <Setter TargetName="P" Property="Stroke" Value="{StaticResource AccentBrush}" />
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
@@ -415,12 +422,12 @@
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#F1F7FE" />
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource RowHoverBrush}" />
                             <Setter TargetName="FilterBtn" Property="Visibility" Value="Visible" />
                             <Setter Property="Foreground" Value="{StaticResource InkBrush}" />
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="#E3EFFC" />
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource PressBlueBrush}" />
                         </Trigger>
                         <DataTrigger Binding="{Binding Content.Filtered, RelativeSource={RelativeSource Self}}" Value="True">
                             <Setter TargetName="FilterBtn" Property="Visibility" Value="Visible" />

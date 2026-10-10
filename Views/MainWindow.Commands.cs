@@ -465,8 +465,14 @@ public partial class MainWindow
             data.SetData("Preferred DropEffect", new MemoryStream(BitConverter.GetBytes(cut ? 2 : 5)));
         }
         data.SetData(ClipFormat, _clip.Token);
-        try { Clipboard.SetDataObject(data, true); }
-        catch (Exception ex) { Toast("클립보드를 사용할 수 없습니다", ex.Message); return; }
+        // 다른 프로그램이 클립보드를 잠깐 쥐고 있을 수 있어 몇 번 다시 시도
+        Exception? clipError = null;
+        for (int attempt = 0; attempt < 10; attempt++)
+        {
+            try { Clipboard.SetDataObject(data, true); clipError = null; break; }
+            catch (Exception ex) { clipError = ex; Thread.Sleep(50); }
+        }
+        if (clipError != null) { Toast("클립보드를 사용할 수 없습니다", "다른 프로그램이 클립보드를 쓰고 있습니다. 잠시 후 다시 시도하세요."); return; }
         if (cut) foreach (var i in sel) i.IsCut = true;
     }
 
@@ -493,8 +499,12 @@ public partial class MainWindow
 
     private void Paste(Location target)
     {
-        IDataObject? data;
-        try { data = Clipboard.GetDataObject(); } catch { return; }
+        IDataObject? data = null;
+        for (int attempt = 0; attempt < 10 && data == null; attempt++)
+        {
+            try { data = Clipboard.GetDataObject(); }
+            catch { Thread.Sleep(50); }
+        }
         if (data == null) return;
         var internalClip = _clip != null && data.GetDataPresent(ClipFormat) && data.GetData(ClipFormat) as string == _clip.Token ? _clip : null;
         var files = data.GetDataPresent(DataFormats.FileDrop) ? data.GetData(DataFormats.FileDrop) as string[] ?? [] : [];

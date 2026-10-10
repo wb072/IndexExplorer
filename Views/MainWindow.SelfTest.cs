@@ -259,7 +259,10 @@ public partial class MainWindow
                 StartMarquee();
                 _mSv.ScrollToVerticalOffset(h * 45);
                 _mSv.UpdateLayout();
-                // 사용자가 61번째 줄(번호 60)을 가리킨 상황
+                // 사용자가 61번째 줄(번호 60)을 가리킨 상황 — 스크롤 뒤 화면이 다 그려진 다음 위치를 읽는다
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                List.ScrollIntoView(List.Items[60]);
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 var row60 = List.ItemContainerGenerator.ContainerFromIndex(60) as ListViewItem;
                 var y60 = row60?.TranslatePoint(new Point(0, row60.ActualHeight / 2), _mScp).Y ?? 0;
                 UpdateMarquee(new Point(520, y60));
