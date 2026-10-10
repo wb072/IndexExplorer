@@ -156,7 +156,8 @@
             </Setter>
         </Style>
 
-        <ItemsPanelTemplate x:Key="RowsPanel"><VirtualizingStackPanel /></ItemsPanelTemplate>
+        <!-- 첫 줄이 열 제목 아래 선에 붙지 않도록 위에 살짝 여백 -->
+        <ItemsPanelTemplate x:Key="RowsPanel"><VirtualizingStackPanel Margin="0,4,0,0" /></ItemsPanelTemplate>
         <ItemsPanelTemplate x:Key="TilesPanel"><WrapPanel Margin="8,6" /></ItemsPanelTemplate>
 
         <!-- 주소 표시줄 한 칸 -->
