@@ -484,6 +484,7 @@ public partial class MainWindow : Window
         SyncTreeSelection();
         UpdateNavButtons();
         StartDirWatcher();
+        UpdateSearchHint();
     }
 
     private (string key, bool desc)? _sortBeforeRecent;
@@ -675,8 +676,7 @@ public partial class MainWindow : Window
                 BuildDuplicateItems(list);
                 break;
             case LocKind.Search:
-                list.AddRange(_store.SearchFolders(_loc.Query).Select(f => FolderItem(f, withLocation: true)));
-                list.AddRange(_store.SearchFiles(_loc.Query).Take(5000).Select(FileItem));
+                BuildSearchItems(list);
                 break;
             case LocKind.ThisPC:
                 foreach (var d in DriveInfo.GetDrives())
@@ -811,7 +811,8 @@ public partial class MainWindow : Window
             LocKind.IndexFolder => ("이 색인은 비어 있습니다", "원본이나 미분류 함에서 파일을 끌어다 놓으면 연결됩니다.\n파일은 원래 자리에 그대로 있습니다."),
             LocKind.Recent => RecentFiles.IsLoading ? ("최근 문서를 불러오는 중…", "") : ("최근에 연 문서가 없습니다", "문서를 열면 여기에 최근 순서로 모입니다."),
             LocKind.Inbox => ("모두 분류했습니다", "새로 생기는 파일은 여기에 먼저 모입니다."),
-            LocKind.Search => ("검색 결과가 없습니다", "다른 단어로 찾아보세요. 띄어 쓴 단어는 모두 포함된 파일을 찾습니다."),
+            LocKind.Search => OutsideSearching ? ($"‘{SearchScopeName(_loc)}’에서 찾는 중…", "")
+                : ("검색 결과가 없습니다", SearchScopeName(_loc) is { } sn ? $"‘{sn}’ 안에서 찾았습니다. 오른쪽 [모든 곳에서 찾기]로 넓힐 수 있습니다." : "다른 단어로 찾아보세요. 띄어 쓴 단어는 모두 포함된 파일을 찾습니다."),
             LocKind.AllFiles => ("색인된 파일이 없습니다", "설정에서 색인할 폴더를 추가하세요."),
             LocKind.Duplicates => _dupRunning ? ("중복 파일을 찾는 중…", _dupStatus) : ("중복 파일이 없습니다", "내용이 같은 파일이 두 곳 이상에 있으면 여기에 모입니다."),
             LocKind.FileKind => EngineServes((byte)_loc.FolderId) ? (_kindLoading ? ("PC 전체에서 찾는 중…", "")
@@ -1068,7 +1069,7 @@ public partial class MainWindow : Window
                 Add("파일 종류", _loc);
                 Add(FileKinds.ById((byte)_loc.FolderId)?.Name ?? "", _loc);
                 break;
-            case LocKind.Search: Add($"‘{_loc.Query}’ 검색 결과", _loc); break;
+            case LocKind.Search: Add(SearchScopeName(_loc) is { } scope ? $"‘{scope}’에서 ‘{_loc.Query}’ 검색 결과" : $"‘{_loc.Query}’ 검색 결과", _loc); break;
             case LocKind.ThisPC: Add("내 PC", _loc); break;
             case LocKind.Dir:
                 Add("내 PC", new Location(LocKind.ThisPC));
@@ -1191,7 +1192,7 @@ public partial class MainWindow : Window
         }
         if (_loc.Kind != LocKind.Search) _beforeSearch = _loc;
         var before = _beforeSearch;
-        var loc = new Location(LocKind.Search, Query: q);
+        var loc = SearchLocation(q, before);
         if (_loc.Kind == LocKind.Search) { _loc = loc; LoadItems(reset: true); UpdateCrumb(); return; }
         Navigate(loc);
         _beforeSearch = before;
@@ -1199,7 +1200,8 @@ public partial class MainWindow : Window
 
     private void ClearSearch()
     {
-        if (SearchBox.Text.Length == 0) return;
+        _searchEverywhere = false;
+        if (SearchBox.Text.Length == 0) { UpdateSearchHint(); return; }
         SearchBox.Text = "";
         _searchTimer.Stop();
         RunSearch();

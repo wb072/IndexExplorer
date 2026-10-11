@@ -229,7 +229,19 @@ public partial class MainWindow
                 SetPreviewImage(null, true);
                 PvTitle.Text = $"‘{_loc.Query}’";
                 PvSub.Text = $"결과 {_items.Count:N0}개";
-                Para("파일 이름과 색인 폴더 이름에서 찾습니다. 띄어 쓴 단어는 모두 포함된 항목만 보여줍니다.");
+                Label("찾는 범위");
+                if (SearchScopeName(_loc) is { } scope)
+                {
+                    Badge($"‘{scope}’ 안 (하위 폴더 포함)", true);
+                    Buttons(ActionButton("모든 곳에서 찾기", () => SetSearchEverywhere(true)));
+                }
+                else
+                {
+                    Badge("색인할 폴더 전체", false);
+                    if (_searchEverywhere && _beforeSearch is { } b && ScopedLoc(b))
+                        Buttons(ActionButton($"‘{(b.Kind == LocKind.Dir ? DirLeaf(b.Path) : _store.Folder(b.FolderId)?.Name)}’ 안에서만 찾기", () => SetSearchEverywhere(false)));
+                }
+                Para("파일 이름에서 찾습니다. 띄어 쓴 단어는 모두 포함된 항목만 보여 줍니다. 디스크를 훑지 않아 바로 나옵니다.");
                 break;
             case LocKind.Dir:
                 SetPreviewImage(ShellImages.Icon(_loc.Path, true, 48, perPath: true), true);

@@ -278,7 +278,9 @@ public partial class MainWindow
             var renamed = RenamePhysical(v2.Path, "A프로젝트_견적서_v2_검토.xlsx", false);
             Check("실제 파일 이름 바꾸기 → 연결 유지", renamed != null && v2.Path == renamed && v2.Folders.Contains(q.Id));
 
-            // 13) 검색
+            // 13) 검색 (색인 맨 위에서 = 전체)
+            Navigate(new Location(LocKind.IndexRoot));
+            await Settle(200);
             SetSearchText("견적");
             RunSearch();
             await Settle();
@@ -936,6 +938,59 @@ public partial class MainWindow
             Check("두 번째 창 색인 표시 공유", w2.TestItemNames().Count == _store.FilesIn(r.Id).Count());
             w2.TestShot("11_두번째창");
             w2.Close();
+
+            // 32) 검색 범위 (탐색기와 같음): 원본 폴더에서 찾으면 그 폴더와 하위 폴더 안에서만
+            {
+                Navigate(new Location(LocKind.Dir, Path: P("업무")));
+                await Settle(300);
+                var hint = SearchHint.Text;
+                SearchBox.Text = "견적";
+                _searchTimer.Stop();
+                RunSearch();
+                await Settle(300);
+                var inDir = _items.Select(i => i.Path).ToList();
+                Check("검색 범위: 원본 폴더에서는 그 안(하위 포함)에서만, 안내 글자도 ‘업무’에서 검색",
+                    hint == "‘업무’에서 검색" && inDir.Count > 0 && inDir.All(p => PathUtil.IsUnder(p, P("업무"))) && inDir.Any(p => p.EndsWith("A프로젝트_견적서_v3.xlsx")),
+                    $"{hint} / {string.Join(", ", inDir.Select(Path.GetFileName))}");
+                Check("검색 범위: 주소 줄에 범위", CrumbItems.Items.Cast<object>().LastOrDefault()?.ToString()?.Length > 0 && Title.Contains("‘업무’에서"), Title);
+                Shot("32_검색_폴더안");
+                SetSearchEverywhere(true);
+                await Settle(300);
+                Check("검색 범위: 모든 곳에서 찾기", _items.Any(i => i.Path.Contains(@"\Downloads\A프로젝트_견적서_v2")) && _loc.Path.Length == 0, $"{_items.Count}개");
+                SetSearchEverywhere(false);
+                await Settle(300);
+                Check("검색 범위: 다시 폴더 안으로", _loc.Path == P("업무") && _items.All(i => PathUtil.IsUnder(i.Path, P("업무"))));
+                SearchBox.Text = "2024";
+                _searchTimer.Stop();
+                RunSearch();
+                await Settle(300);
+                Check("검색 범위: 하위 폴더 이름도 찾음", _items.Any(i => i.Kind == ItemKind.Dir && i.Name == "2024"), string.Join(", ", _items.Select(i => i.Name).Take(5)));
+                ClearSearch();
+                await Settle(200);
+                // 색인 폴더에서 찾으면 그 색인과 하위 색인 안에서만
+                Navigate(new Location(LocKind.IndexFolder, a.Id));
+                await Settle(300);
+                SearchBox.Text = "견적";
+                _searchTimer.Stop();
+                RunSearch();
+                await Settle(300);
+                var bIds = _store.Descendants(a.Id).Append(a.Id).ToHashSet();
+                Check("검색 범위: 색인 폴더에서는 그 색인(하위 포함) 안에서만",
+                    _loc.FolderId == a.Id && _items.Count > 0 && _items.All(i => i.Kind == ItemKind.IndexFolder ? bIds.Contains(i.FolderId) : i.Record?.Folders.Overlaps(bIds) == true),
+                    $"{_items.Count}개: {string.Join(", ", _items.Select(i => i.Name))}");
+                ClearSearch();
+                await Settle(200);
+                // 색인할 폴더 밖 원본 폴더 (엔진이 없으면 직접 훑는다)
+                Navigate(new Location(LocKind.Dir, Path: P("외부")));
+                await Settle(300);
+                SearchBox.Text = "보고서";
+                _searchTimer.Stop();
+                RunSearch();
+                await WaitUntil(() => !OutsideSearching && _items.Count > 0, 10000);
+                Check("검색 범위: 색인할 폴더 밖 원본 폴더도 그 안에서 찾음", _items.Count == 1 && _items[0].Name == "보고서_초안.docx", string.Join(", ", _items.Select(i => i.Name)));
+                ClearSearch();
+                await Settle(200);
+            }
 
             // 31) 원본 폴더 자체를 색인 폴더로: 고르기 메뉴 맨 위 = 지금 폴더(또는 고른 폴더), 그다음 최근에 추가한 색인
             {
