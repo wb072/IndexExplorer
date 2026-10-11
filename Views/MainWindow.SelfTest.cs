@@ -20,6 +20,7 @@ namespace IndexExplorer.Views;
 public partial class MainWindow
 {
     private readonly List<string> _results = [];
+    private bool _kindsCollapsedAtStart;
 
     private void Check(string name, bool ok, string detail = "") =>
         _results.Add($"{(ok ? "PASS" : "FAIL")}  {name}{(detail.Length > 0 ? "  — " + detail : "")}");
@@ -63,7 +64,7 @@ public partial class MainWindow
     private void ShowItemsForTest(List<ListItem> list)
     {
         _items = new System.Collections.ObjectModel.ObservableCollection<ListItem>(list);
-        _view = new ListCollectionView(_items) { CustomSort = new ItemComparer(_sortKey, _sortDesc) };
+        _view = new ListCollectionView(_items) { CustomSort = new ItemComparer(_sortKey, _sortDesc, _items) };
         ApplyGrouping();
         List.ItemsSource = _view;
         UpdateStatus();
@@ -105,6 +106,7 @@ public partial class MainWindow
     {
         var T = App.SelfTestRoot!;
         var S = _settings.StorageRoot;
+        _kindsCollapsedAtStart = !_kindsNode.IsExpanded;
         try
         {
             if (!App.Engine.Disabled)
@@ -685,6 +687,29 @@ public partial class MainWindow
                 Check("파일 종류 설정: 끄면 사라지고 보던 화면은 모든 파일로", KindNode(13) == null && KindNode(64) == null && _loc.Kind == LocKind.AllFiles);
             }
 
+            // 26-3) 색인 쪽 사이드바 순서와 바탕 화면·다운로드 바로 가기
+            {
+                var order = _indexNodes.Select(n => n.Name).ToList();
+                Check("사이드바: 바탕 화면·다운로드·색인·파일 종류·최근 문서 … 순서, 파일 종류는 접힘",
+                    order.Take(5).SequenceEqual(["바탕 화면", "다운로드", "색인", "파일 종류", "최근 문서"]) && _kindsCollapsedAtStart,
+                    string.Join(" · ", order));
+                var desk = _indexQuick[0];
+                desk.IsSelected = true; // 트리에서 누른 것과 같음
+                await Settle(400);
+                Check("사이드바: 색인 쪽 바탕 화면은 색인 화면 그대로 그 폴더를 보여 줌",
+                    _loc.Kind == LocKind.Dir && _loc.Path == desk.Path && ModeIndex.IsChecked == true && IndexTree.Visibility == Visibility.Visible && desk.IsSelected,
+                    $"{_loc.Kind} {_loc.Path}, 색인 모드 {ModeIndex.IsChecked}");
+                Shot("26_사이드바_바탕화면");
+                Navigate(new Location(LocKind.Dir, Path: P("Downloads")));
+                await Settle(300);
+                Check("사이드바: 다른 원본 폴더로 가면 원본 화면으로", ModePhys.IsChecked == true && PhysTree.Visibility == Visibility.Visible);
+                ModeIndex.IsChecked = true;
+                await Settle(300);
+                Check("사이드바: 색인으로 돌아오면 마지막 색인 쪽 위치(바탕 화면)", _loc.Path == desk.Path && ModeIndex.IsChecked == true, _loc.Path);
+                Navigate(new Location(LocKind.IndexRoot));
+                await Settle(300);
+            }
+
             // 27) 파일 종류 화면 (엔진 없이 = 색인한 폴더 안에서)
             Navigate(new Location(LocKind.FileKind, 1));
             await Settle(500);
@@ -850,6 +875,31 @@ public partial class MainWindow
                 await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 Check("대량 5만: 폴더별로 묶기 (200곳)", _view.Groups?.Count == 200 && swB.ElapsedMilliseconds < 3000, $"{swB.ElapsedMilliseconds}ms");
                 SetGroupBy(GroupBy.None);
+
+                // 원본 위치가 8천 곳: 열 필터 열기·정렬 (미분류 함에서 멈추던 문제)
+                var spread = new List<ListItem>(50_000);
+                for (int i = 0; i < 50_000; i++)
+                    spread.Add(new ListItem
+                    {
+                        Kind = ItemKind.File, Path = $@"X:\흩어짐\상위{i % 40:D2}\폴더{i % 8000:D4}\파일{i:D5}.txt", Name = $"파일{i:D5}.txt", Size = 1000 + i,
+                        Modified = now.AddMinutes(-i), TypeName = "텍스트 문서", Location = $@"X:\흩어짐\상위{i % 40:D2}\폴더{i % 8000:D4}",
+                    });
+                ShowItemsForTest(spread);
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var locCol = _colInfo.First(kv => kv.Value.key == "Location").Key;
+                swB.Restart();
+                OpenFilterMenu(locCol, List);
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var filterMs = swB.ElapsedMilliseconds;
+                var shownRows = TestFilterRowsMade();
+                TestShotFilter("29_필터_원본위치_8천곳");
+                TestCloseFilter();
+                Check("대량: 원본 위치 8천 곳 — 열 필터 열기", filterMs < 1000, $"{filterMs}ms, 만든 줄 {shownRows}개");
+                swB.Restart();
+                SetSort("Location");
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                Check("대량: 원본 위치 8천 곳 — 원본 위치로 정렬", swB.ElapsedMilliseconds < 1500, $"{swB.ElapsedMilliseconds}ms");
+                SetSort("Name", false);
                 Navigate(new Location(LocKind.Dir, Path: P("Downloads")));
                 await Settle(300);
             }

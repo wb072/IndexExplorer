@@ -1,6 +1,9 @@
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Data;
+using System.Windows.Media;
 using IndexExplorer.ViewModels;
 
 namespace IndexExplorer.Views;
@@ -96,6 +99,23 @@ public partial class MainWindow
         UpdatePreview();
     }
 
+    /// <summary>필터 창의 한 줄 (값 묶음 하나).</summary>
+    public sealed class FilterRow : CommunityToolkit.Mvvm.ComponentModel.ObservableObject
+    {
+        public required string Bucket { get; init; }
+        public required string Title { get; init; }
+        public string Sub { get; init; } = "";
+        public required string Count { get; init; }
+        private bool _checked;
+        public bool IsChecked { get => _checked; set => SetProperty(ref _checked, value); }
+    }
+
+    private Popup? _filterPopup;
+
+    /// <summary>
+    /// 열 필터 창. 값이 수천 개(원본 위치 등)여도 멈추지 않게 가상화 목록으로 보이는 줄만 만든다
+    /// (예전 메뉴는 값마다 메뉴 항목을 만들어 8천 곳에서 2분 넘게 멈췄다). 값이 많으면 찾기 칸이 나온다.
+    /// </summary>
     private void OpenFilterMenu(GridViewColumn col, FrameworkElement anchor)
     {
         if (!_colInfo.TryGetValue(col, out var info)) return;
@@ -105,40 +125,147 @@ public partial class MainWindow
         foreach (var i in _items)
         {
             if (i.IsFolderLike && key != "Name") continue;
-            foreach (var b in Buckets(i, key).Distinct()) counts[b] = counts.GetValueOrDefault(b) + 1;
+            if (key == "Index") { foreach (var b in Buckets(i, key).Distinct()) counts[b] = counts.GetValueOrDefault(b) + 1; }
+            else { var b = Buckets(i, key).First(); counts[b] = counts.GetValueOrDefault(b) + 1; }
         }
         string[]? fixedOrder = key switch { "Name" => NameOrder, "Modified" => DateOrder, "Size" => SizeOrder, _ => null };
-        var ordered = fixedOrder != null
-            ? fixedOrder.Where(counts.ContainsKey).ToList()
-            : counts.Keys.Order(Services.NaturalComparer.Instance).ToList();
+        List<string> ordered;
+        if (fixedOrder != null) ordered = fixedOrder.Where(counts.ContainsKey).ToList();
+        else
+        {
+            var arr = counts.Keys.ToArray();
+            Array.Sort(arr, Services.NaturalComparer.Instance);
+            ordered = [.. arr];
+        }
 
-        var menu = new ContextMenu { PlacementTarget = anchor, Placement = PlacementMode.Bottom, MaxHeight = 460 };
         _filters.TryGetValue(key, out var current);
+        var rows = ordered.Select(b =>
+        {
+            // 원본 위치는 폴더 이름을 앞에, 경로는 흐리게
+            var isPath = key == "Location" && b.Contains('\\');
+            return new FilterRow
+            {
+                Bucket = b, Title = isPath ? Path.GetFileName(b.TrimEnd('\\')) is { Length: > 0 } leaf ? leaf : b : b,
+                Sub = isPath ? Path.GetDirectoryName(b.TrimEnd('\\')) ?? "" : "",
+                Count = counts[b].ToString("N0"), IsChecked = current?.Contains(b) == true,
+            };
+        }).ToList();
+        var view = new ListCollectionView(rows);
+
+        var list = new ListBox
+        {
+            ItemsSource = view, MaxHeight = 380, BorderThickness = new Thickness(0), Background = Brushes.Transparent,
+            Foreground = (Brush)FindResource("InkBrush"), Padding = new Thickness(0, 0, 4, 0),
+            ItemTemplate = (DataTemplate)FindResource("FilterRowTemplate"),
+            ItemContainerStyle = (Style)FindResource("PlainListItem"),
+            Focusable = false,
+        };
+        ScrollViewer.SetHorizontalScrollBarVisibility(list, ScrollBarVisibility.Disabled);
+        VirtualizingPanel.SetIsVirtualizing(list, true);
+        VirtualizingPanel.SetVirtualizationMode(list, VirtualizationMode.Recycling);
+        VirtualizingPanel.SetScrollUnit(list, ScrollUnit.Pixel);
+
+        void Toggle(FilterRow row)
+        {
+            if (!_filters.TryGetValue(key, out var set)) _filters[key] = set = [];
+            if (row.IsChecked) set.Add(row.Bucket); else set.Remove(row.Bucket);
+            if (set.Count == 0) _filters.Remove(key);
+            ApplyFilter();
+        }
+        list.AddHandler(System.Windows.Controls.Primitives.ToggleButton.ClickEvent, new RoutedEventHandler((_, e) =>
+        {
+            if ((e.OriginalSource as FrameworkElement)?.DataContext is FilterRow row) Toggle(row);
+        }));
+        // 줄 아무 곳이나 눌러도 체크
+        list.PreviewMouseLeftButtonUp += (_, e) =>
+        {
+            if (e.OriginalSource is DependencyObject d && FindAncestor<CheckBox>(d) == null && FindAncestor<ListBoxItem>(d)?.DataContext is FilterRow row)
+            {
+                row.IsChecked = !row.IsChecked;
+                Toggle(row);
+            }
+        };
+
+        var panel = new StackPanel { Width = 340 };
+        if (rows.Count > 12)
+        {
+            var search = new TextBox { Style = (Style)FindResource("FormBox"), Margin = new Thickness(8, 8, 8, 4) };
+            var hint = new TextBlock
+            {
+                Text = $"{rows.Count:N0}개 중 찾기", Foreground = (Brush)FindResource("MutedBrush"), IsHitTestVisible = false,
+                Margin = new Thickness(20, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center,
+            };
+            search.TextChanged += (_, _) =>
+            {
+                var q = search.Text.Trim();
+                hint.Visibility = q.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+                view.Filter = q.Length == 0 ? null : o => ((FilterRow)o).Bucket.Contains(q, StringComparison.CurrentCultureIgnoreCase);
+            };
+            var g = new Grid();
+            g.Children.Add(search);
+            g.Children.Add(hint);
+            hint.Margin = new Thickness(23, 4, 0, 0);
+            panel.Children.Add(g);
+            panel.Loaded += (_, _) => search.Focus();
+        }
         if (current != null)
         {
-            var clear = new MenuItem { Header = "필터 지우기" };
-            clear.Click += (_, _) => { _filters.Remove(key); ApplyFilter(); };
-            menu.Items.Add(clear);
-            menu.Items.Add(new Separator());
+            var clear = new Button { Style = (Style)FindResource("ToolButtonB"), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left, Height = 30, Margin = new Thickness(4, 4, 4, 0) };
+            clear.Content = new TextBlock { Text = "필터 지우기", Foreground = (Brush)FindResource("AccentBrush") };
+            clear.Click += (_, _) => { _filters.Remove(key); ApplyFilter(); _filterPopup!.IsOpen = false; };
+            panel.Children.Add(clear);
         }
-        if (ordered.Count == 0) menu.Items.Add(new MenuItem { Header = "항목 없음", IsEnabled = false });
-        foreach (var b in ordered)
+        if (rows.Count == 0) panel.Children.Add(new TextBlock { Text = "항목 없음", Foreground = (Brush)FindResource("MutedBrush"), Margin = new Thickness(14, 10, 14, 10) });
+        else panel.Children.Add(list);
+
+        var border = new Border
         {
-            var bucket = b;
-            var mi = new MenuItem
-            {
-                Header = bucket, InputGestureText = counts[bucket].ToString("N0"),
-                IsCheckable = true, IsChecked = current?.Contains(bucket) == true, StaysOpenOnClick = true,
-            };
-            mi.Click += (_, _) =>
-            {
-                if (!_filters.TryGetValue(key, out var set)) _filters[key] = set = [];
-                if (mi.IsChecked) set.Add(bucket); else set.Remove(bucket);
-                if (set.Count == 0) _filters.Remove(key);
-                ApplyFilter();
-            };
-            menu.Items.Add(mi);
+            Background = Brushes.White, BorderBrush = (Brush)FindResource("HairlineBrush"), BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8), Padding = new Thickness(0, 2, 0, 4), Margin = new Thickness(8, 2, 8, 10), Child = panel,
+            Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 14, ShadowDepth = 3, Opacity = 0.12, Color = Colors.Black },
+        };
+        _filterPopup = new Popup
+        {
+            Child = border, PlacementTarget = anchor, Placement = PlacementMode.Bottom, StaysOpen = false,
+            AllowsTransparency = true, PopupAnimation = PopupAnimation.Fade, HorizontalOffset = -8,
+        };
+        border.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Escape) _filterPopup.IsOpen = false; };
+        _filterPopup.IsOpen = true;
+    }
+
+    internal int TestFilterRowsMade() =>
+        _filterPopup?.Child is { } c ? CountDescendants<ListBoxItem>(c) : 0;
+    internal void TestCloseFilter() { if (_filterPopup != null) _filterPopup.IsOpen = false; }
+
+    internal void TestShotFilter(string name)
+    {
+        if (_filterPopup?.Child is not FrameworkElement fe) return;
+        var dpi = VisualTreeHelper.GetDpi(fe);
+        var size = new Rect(0, 0, fe.ActualWidth, fe.ActualHeight);
+        var dv = new DrawingVisual();
+        using (var dc = dv.RenderOpen())
+        {
+            dc.DrawRectangle(Brushes.White, null, size);
+            dc.DrawRectangle(new VisualBrush(fe), null, size);
         }
-        menu.IsOpen = true;
+        var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap((int)(size.Width * dpi.DpiScaleX), (int)(size.Height * dpi.DpiScaleY),
+            96 * dpi.DpiScaleX, 96 * dpi.DpiScaleY, PixelFormats.Pbgra32);
+        rtb.Render(dv);
+        var enc = new System.Windows.Media.Imaging.PngBitmapEncoder();
+        enc.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(rtb));
+        using var fs = File.Create(Path.Combine(App.SelfTestOut!, name + ".png"));
+        enc.Save(fs);
+    }
+
+    private static int CountDescendants<T>(DependencyObject d) where T : DependencyObject
+    {
+        int n = 0;
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(d); i++)
+        {
+            var c = VisualTreeHelper.GetChild(d, i);
+            if (c is T) n++;
+            n += CountDescendants<T>(c);
+        }
+        return n;
     }
 }

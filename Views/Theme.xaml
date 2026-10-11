@@ -215,6 +215,36 @@
         </Setter>
     </Style>
 
+    <!-- 목록 줄 그릇: Fluent 기본 선택 모양 없이, 옅은 파란 호버만 -->
+    <Style x:Key="PlainListItem" TargetType="ListBoxItem">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="Bd" Background="Transparent" CornerRadius="6" Margin="4,0" Padding="6,0,10,0" Height="30">
+                        <ContentPresenter VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource RowHoverBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 열 필터 창의 한 줄: 체크 · 이름 · (경로) · 개수 -->
+    <DataTemplate x:Key="FilterRowTemplate">
+        <DockPanel ToolTip="{Binding Bucket}">
+            <CheckBox DockPanel.Dock="Left" Style="{StaticResource BlueCheck}" IsChecked="{Binding IsChecked, Mode=TwoWay}" VerticalAlignment="Center" Margin="0,0,4,0" />
+            <TextBlock DockPanel.Dock="Right" Text="{Binding Count}" Foreground="{StaticResource MutedBrush}" FontSize="12" VerticalAlignment="Center" Margin="10,0,0,0" />
+            <TextBlock DockPanel.Dock="Left" Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="170" />
+            <TextBlock Text="{Binding Sub}" Foreground="{StaticResource MutedBrush}" FontSize="11.5" VerticalAlignment="Center" Margin="8,0,0,0" TextTrimming="CharacterEllipsis" />
+        </DockPanel>
+    </DataTemplate>
+
     <!-- 보조 버튼 (흰 바탕 + 헤어라인 + 둥근 모서리) -->
     <Style x:Key="PearlButton" TargetType="Button">
         <Setter Property="Foreground" Value="{StaticResource InkBrush}" />

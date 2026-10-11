@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -33,6 +33,8 @@ public sealed partial class TreeNode : ObservableObject
     public bool ChildrenLoaded { get; set; }
 
     public bool IsIndex => Kind is NodeKind.IndexRoot or NodeKind.IndexFolder;
+    /// <summary>색인 쪽 트리에 있는 원본 바로 가기 (바탕 화면·다운로드).</summary>
+    public bool InIndexTree { get; init; }
     public bool CanRename => Kind == NodeKind.IndexFolder || (Kind == NodeKind.Dir && Parent?.Kind != NodeKind.ThisPC && Parent != null);
 
     /// <summary>원본 폴더 하위 읽기 (펼침 화살표 표시를 위해 미리 한 단계만).</summary>

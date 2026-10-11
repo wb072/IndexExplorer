@@ -111,7 +111,7 @@ public partial class MainWindow : Window
         _colIndex = _grid.Columns[5];
         TextSearch.SetTextPath(List, "Name");
 
-        _view = new ListCollectionView(_items) { CustomSort = new ItemComparer(_sortKey, _sortDesc) };
+        _view = new ListCollectionView(_items) { CustomSort = new ItemComparer(_sortKey, _sortDesc, _items) };
         List.ItemsSource = _view;
         ApplyViewMode();
         ApplyPreviewVisibility();
@@ -127,6 +127,8 @@ public partial class MainWindow : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        // 창을 만드는 중 셸 아이콘을 읽으면 메시지가 돌아 Loaded 가 먼저 올 수 있다. 사이드바가 다 만들어진 뒤에 시작한다.
+        if (_indexNodes.Count == 0) { Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => OnLoaded(sender, e)); return; }
         RecentFiles.Current(); // 최근 문서를 미리 읽어 둔다 (처음 열 때 기다리지 않도록)
         StartEnginePolling();
         if (App.IndexerStarted) { StartDirWatcher(); return; } // 두 번째 이후 창
@@ -134,7 +136,8 @@ public partial class MainWindow : Window
         if (App.SelfTestOut != null)
         {
             _indexer.Start();
-            _ = RunSelfTest();
+            // 자체 검증이 예외로 끝나도 기록을 남긴다 (조용히 멈춰 시간만 넘기지 않게)
+            RunSelfTest().ContinueWith(t => { if (t.Exception != null) App.Log("selftest: " + t.Exception); }, TaskScheduler.FromCurrentSynchronizationContext());
             return;
         }
         if (!_settings.FirstRunDone)
@@ -215,7 +218,7 @@ public partial class MainWindow : Window
             ? []
             : AllNodes(_indexNodes).Where(n => n.IsExpanded && n.Kind == NodeKind.IndexFolder).Select(n => n.FolderId).ToHashSet();
         var rootExpanded = _indexRoot?.IsExpanded ?? true;
-        var kindsExpanded = _kindsNode?.IsExpanded ?? true;
+        var kindsExpanded = _kindsNode?.IsExpanded ?? false; // 파일 종류는 처음엔 접어 둔다
 
         _indexRoot = new TreeNode { Kind = NodeKind.IndexRoot, Name = "색인", Icon = (ImageSource)FindResource("IconAppSmall"), IsExpanded = rootExpanded };
         AddFolderNodes(_indexRoot, null, expanded);
@@ -226,13 +229,22 @@ public partial class MainWindow : Window
         _syncingTree = true;
         try
         {
+            // 순서: 바탕 화면 · 다운로드 · 색인 · 파일 종류 · 최근 문서 · 미분류 함 · 모든 파일 · 중복 파일
             _indexNodes.Clear();
+            _indexQuick.Clear();
+            foreach (var (p, name) in IndexQuickPlaces())
+            {
+                // 원본 폴더 바로 가기: 펼치지 않는 한 줄 (누르면 색인 화면 그대로 그 폴더를 보여 준다)
+                var q = new TreeNode { Kind = NodeKind.Dir, Path = p, Name = name, Icon = ShellImages.Icon(p, true, perPath: true), InIndexTree = true };
+                _indexQuick.Add(q);
+                _indexNodes.Add(q);
+            }
             _indexNodes.Add(_indexRoot);
+            _indexNodes.Add(_kindsNode = BuildKindsNode(kindsExpanded));
             _indexNodes.Add(_recentNode);
             _indexNodes.Add(_inboxNode);
             _indexNodes.Add(_allNode);
             _indexNodes.Add(_dupNode = new TreeNode { Kind = NodeKind.Duplicates, Name = "중복 파일", Icon = (ImageSource)FindResource("IconDuplicates") });
-            _indexNodes.Add(_kindsNode = BuildKindsNode(kindsExpanded));
         }
         finally { _syncingTree = false; }
         _folderSignature = FolderSignature();
@@ -240,6 +252,16 @@ public partial class MainWindow : Window
         UpdateKindBadges();
         UpdateDupBadge();
     }
+
+    private readonly List<TreeNode> _indexQuick = [];
+
+    private static IEnumerable<(string path, string name)> IndexQuickPlaces() =>
+        new[] { (Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "바탕 화면"), (KnownFolders.Downloads, "다운로드") }
+            .Where(q => q.Item1.Length > 0 && Directory.Exists(q.Item1));
+
+    /// <summary>색인 쪽 바로 가기(바탕 화면·다운로드) 중 이 경로를 담는 것.</summary>
+    private TreeNode? IndexQuickFor(string path) =>
+        _indexQuick.Where(q => PathUtil.IsUnder(path, q.Path)).OrderByDescending(q => q.Path.Length).FirstOrDefault();
 
     private void AddFolderNodes(TreeNode parent, long? parentId, HashSet<long> expanded)
     {
@@ -335,7 +357,7 @@ public partial class MainWindow : Window
                 LocKind.Duplicates => _dupNode,
                 LocKind.FileKind => KindNode(_loc.FolderId),
                 LocKind.ThisPC => _pcNode,
-                LocKind.Dir => RevealPhysNode(_loc.Path),
+                LocKind.Dir => ModeIndex.IsChecked == true ? IndexQuickFor(_loc.Path) : RevealPhysNode(_loc.Path),
                 _ => null,
             };
             if (target == null) return;
@@ -348,7 +370,7 @@ public partial class MainWindow : Window
 
     private void BringNodeIntoView(TreeNode node)
     {
-        var tree = node.IsIndex || node.Kind is NodeKind.Recent or NodeKind.Inbox or NodeKind.AllFiles or NodeKind.Duplicates or NodeKind.KindsRoot or NodeKind.FileKind ? IndexTree : PhysTree;
+        var tree = node.IsIndex || node.InIndexTree || node.Kind is NodeKind.Recent or NodeKind.Inbox or NodeKind.AllFiles or NodeKind.Duplicates or NodeKind.KindsRoot or NodeKind.FileKind ? IndexTree : PhysTree;
         var chain = node.Ancestors().Reverse().Append(node).ToList();
         ItemsControl parent = tree;
         foreach (var n in chain)
@@ -449,7 +471,9 @@ public partial class MainWindow : Window
         else if (IsRecentSorted(loc.Kind) && !IsRecentSorted(_loc.Kind)) { _sortBeforeRecent = (_sortKey, _sortDesc); SetSort("Modified", true); }
         else if (!IsRecentSorted(loc.Kind) && IsRecentSorted(_loc.Kind) && _sortBeforeRecent is { } prev) { SetSort(prev.key, prev.desc); _sortBeforeRecent = null; }
         _loc = loc;
-        if (loc.IsPhysical) { _lastPhysLoc = loc; SetMode(true); }
+        // 색인 쪽에서 바탕 화면·다운로드(와 그 안)를 보면 색인 화면 그대로 둔다 (원본으로 넘어가지 않음)
+        if (loc.Kind == LocKind.Dir && ModeIndex.IsChecked == true && IndexQuickFor(loc.Path) != null) { _lastIndexLoc = loc; SetMode(false); }
+        else if (loc.IsPhysical) { _lastPhysLoc = loc; SetMode(true); }
         else if (loc.Kind != LocKind.Search) { _lastIndexLoc = loc; SetMode(false); }
 
         _filters.Clear(); // 다른 곳으로 가면 필터는 풀린다 (탐색기와 같음)
@@ -705,7 +729,7 @@ public partial class MainWindow : Window
         {
             // 다른 곳으로 이동: 컬렉션을 통째로 바꿔 수천 개도 한 번에 그린다
             _items = new ObservableCollection<ListItem>(list);
-            _view = new ListCollectionView(_items) { CustomSort = new ItemComparer(_sortKey, _sortDesc) };
+            _view = new ListCollectionView(_items) { CustomSort = new ItemComparer(_sortKey, _sortDesc, _items) };
             if (_filters.Count > 0) _view.Filter = PassesFilter;
             ApplyGrouping();
             List.ItemsSource = _view;
@@ -851,8 +875,44 @@ public partial class MainWindow : Window
 
     // ===================== 정렬 =====================
 
-    private sealed class ItemComparer(string key, bool desc) : IComparer
+    /// <summary>
+    /// 목록 정렬. 글자 비교(탐색기와 같은 자연 정렬)는 비싸므로, 항목이 주어지면 서로 다른 값만 한 번 자연 정렬해 순위를 매겨 두고
+    /// 정렬 중에는 순위(정수)만 비교한다. 5만 개·원본 위치 8천 곳에서 4.4초 → 1초 안.
+    /// 순위표에 없는 값(나중에 추가된 항목)은 그때 자연 정렬로 비교한다.
+    /// </summary>
+    private sealed class ItemComparer : IComparer
     {
+        private readonly string _key;
+        private readonly bool _desc;
+        private readonly Dictionary<string, int>? _nameRank, _keyRank;
+
+        public ItemComparer(string key, bool desc, IEnumerable<ListItem>? items = null)
+        {
+            _key = key;
+            _desc = desc;
+            if (items == null) return;
+            var list = items as IReadOnlyCollection<ListItem> ?? items.ToList();
+            if (list.Count < 2000) return; // 적으면 그냥 비교가 더 싸다
+            _nameRank = Rank(list.Select(i => i.Name));
+            if (key is "Location" or "Index") _keyRank = Rank(list.Select(i => key == "Location" ? i.Location : i.IndexText));
+        }
+
+        private static Dictionary<string, int> Rank(IEnumerable<string> values)
+        {
+            var arr = values.Distinct(StringComparer.Ordinal).ToArray();
+            Array.Sort(arr, NaturalComparer.Instance);
+            var d = new Dictionary<string, int>(arr.Length, StringComparer.Ordinal);
+            for (int i = 0; i < arr.Length; i++) d[arr[i]] = i;
+            return d;
+        }
+
+        private static int Cmp(Dictionary<string, int>? rank, string a, string b)
+        {
+            if (ReferenceEquals(a, b) || a == b) return 0;
+            if (rank != null && rank.TryGetValue(a, out var ra) && rank.TryGetValue(b, out var rb)) return ra.CompareTo(rb);
+            return NaturalComparer.Instance.Compare(a, b);
+        }
+
         public int Compare(object? x, object? y)
         {
             var a = (ListItem)x!;
@@ -860,17 +920,17 @@ public partial class MainWindow : Window
             int fa = a.IsFolderLike ? 0 : 1, fb = b.IsFolderLike ? 0 : 1;
             if (fa != fb) return fa - fb; // 폴더가 항상 위
             if (a.DupRank is int ra && b.DupRank is int rb && ra != rb) return ra - rb; // 중복 묶음 순서 (낭비 큰 순)
-            int r = key switch
+            int r = _key switch
             {
                 "Modified" => Nullable.Compare(a.Modified, b.Modified),
                 "Type" => string.Compare(a.TypeName, b.TypeName, StringComparison.CurrentCulture),
                 "Size" => Nullable.Compare(a.Size, b.Size),
-                "Location" => NaturalComparer.Instance.Compare(a.Location, b.Location),
-                "Index" => NaturalComparer.Instance.Compare(a.IndexText, b.IndexText),
-                _ => NaturalComparer.Instance.Compare(a.Name, b.Name),
+                "Location" => Cmp(_keyRank, a.Location, b.Location),
+                "Index" => Cmp(_keyRank, a.IndexText, b.IndexText),
+                _ => Cmp(_nameRank, a.Name, b.Name),
             };
-            if (r != 0) return desc ? -r : r;
-            return NaturalComparer.Instance.Compare(a.Name, b.Name);
+            if (r != 0) return _desc ? -r : r;
+            return Cmp(_nameRank, a.Name, b.Name);
         }
     }
 
@@ -878,7 +938,7 @@ public partial class MainWindow : Window
     {
         _sortDesc = desc ?? (key == _sortKey ? !_sortDesc : key == "Modified");
         _sortKey = key;
-        _view.CustomSort = new ItemComparer(_sortKey, _sortDesc);
+        _view.CustomSort = new ItemComparer(_sortKey, _sortDesc, _items);
         UpdateSortHeaders();
     }
 
