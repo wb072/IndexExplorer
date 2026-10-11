@@ -33,6 +33,8 @@ public partial class KindEditWindow : Window
     {
         var exts = FileKinds.ParseExts(ExtBox.Text);
         KindIcon.Source = exts.Length > 0 ? ShellImages.Icon("x." + exts[0], false, 32) : null;
+        // 아이콘이 없으면 자리도 비우지 않는다 (제목이 밀리지 않게)
+        KindIcon.Visibility = KindIcon.Source == null ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void ExtBox_TextChanged(object sender, TextChangedEventArgs e)

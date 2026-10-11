@@ -681,6 +681,14 @@ public partial class MainWindow
                 await Settle(400);
                 TestShotWindow(ed, "26_파일종류_편집");
                 ed.Close();
+                var edNew = new KindEditWindow(new KindSetting { Id = 99, Enabled = true }, _settings.Kinds, isNew: true)
+                    { Owner = this, ShowActivated = false, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = SystemParameters.VirtualScreenLeft - 1000, Top = 0 };
+                edNew.Show();
+                await Settle(400);
+                TestShotWindow(edNew, "26b_파일종류_새종류");
+                Check("파일 종류 편집 창: 입력칸 높이 낮게, 흰 바탕", edNew.NameBox.ActualHeight is > 0 and <= 30 && edNew.Background is SolidColorBrush { Color: var bg } && bg == Colors.White,
+                    $"{edNew.NameBox.ActualHeight:0}px");
+                edNew.Close();
                 // 끄면 사라지고, 보고 있던 종류가 꺼지면 "모든 파일"로
                 _settings.Kinds.RemoveAll(k => k.Id == 64);
                 py.Enabled = false;
