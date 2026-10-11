@@ -1106,6 +1106,7 @@ public partial class MainWindow : Window
             LocKind.ThisPC => "내 PC",
             _ => "",
         };
+        _knownDirs = null; // 드롭다운용 폴더 목록은 처음 찾을 때 새로 만든다
         CrumbItems.Visibility = Visibility.Hidden;
         AddressBox.Visibility = Visibility.Visible;
         AddressBox.Focus();
@@ -1114,6 +1115,7 @@ public partial class MainWindow : Window
 
     private void EndAddressEdit()
     {
+        CloseAddressPopup();
         AddressBox.Visibility = Visibility.Collapsed;
         CrumbItems.Visibility = Visibility.Visible;
     }
@@ -1122,6 +1124,7 @@ public partial class MainWindow : Window
 
     private void AddressBox_KeyDown(object sender, KeyEventArgs e)
     {
+        if (AddressPopupKey(e.Key)) { e.Handled = true; return; }
         if (e.Key == Key.Escape) { EndAddressEdit(); List.Focus(); e.Handled = true; }
         else if (e.Key == Key.Enter)
         {

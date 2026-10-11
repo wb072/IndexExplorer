@@ -235,6 +235,40 @@
         </Setter>
     </Style>
 
+    <!-- 주소 줄 드롭다운의 줄: 마우스를 올리면 옅은 파란색, ↑↓로 고른 줄은 사이드바 선택과 같은 파란색 -->
+    <Style x:Key="AddressListItem" TargetType="ListBoxItem">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="Bd" Background="Transparent" CornerRadius="6" Margin="4,0" Padding="8,0,10,0" Height="32"
+                            BorderThickness="1" BorderBrush="Transparent">
+                        <ContentPresenter VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource RowHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource SidebarSelectBrush}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource SelectInactiveBorderBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 주소 줄 드롭다운의 한 줄: 아이콘 · 폴더 이름 · 전체 경로(흐리게) -->
+    <DataTemplate x:Key="AddressRowTemplate">
+        <DockPanel ToolTip="{Binding Sub}">
+            <Image DockPanel.Dock="Left" Source="{Binding Icon}" Width="16" Height="16" Margin="0,0,10,0" RenderOptions.BitmapScalingMode="HighQuality" />
+            <TextBlock DockPanel.Dock="Left" Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="260" />
+            <TextBlock Text="{Binding Sub}" Foreground="{StaticResource MutedBrush}" FontSize="12" VerticalAlignment="Center" Margin="12,0,0,0" TextTrimming="CharacterEllipsis" />
+        </DockPanel>
+    </DataTemplate>
+
     <!-- 열 필터 창의 한 줄: 체크 · 이름 · (경로) · 개수 -->
     <DataTemplate x:Key="FilterRowTemplate">
         <DockPanel ToolTip="{Binding Bucket}">

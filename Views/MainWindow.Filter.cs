@@ -262,7 +262,12 @@ public partial class MainWindow
 
     internal void TestShotFilter(string name)
     {
-        if (_filterPopup?.Child is not FrameworkElement fe) return;
+        if (_filterPopup?.Child is FrameworkElement fe) ShotElement(fe, name);
+    }
+
+    /// <summary>자체 검증: 떠 있는 창(필터·드롭다운 등) 하나를 PNG로.</summary>
+    private static void ShotElement(FrameworkElement fe, string name)
+    {
         var dpi = VisualTreeHelper.GetDpi(fe);
         var size = new Rect(0, 0, fe.ActualWidth, fe.ActualHeight);
         var dv = new DrawingVisual();

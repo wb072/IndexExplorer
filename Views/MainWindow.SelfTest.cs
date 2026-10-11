@@ -1,4 +1,5 @@
-﻿using IndexExplorer.Engine;
+﻿using System.Windows.Input;
+using IndexExplorer.Engine;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
@@ -990,6 +991,53 @@ public partial class MainWindow
                 Check("검색 범위: 색인할 폴더 밖 원본 폴더도 그 안에서 찾음", _items.Count == 1 && _items[0].Name == "보고서_초안.docx", string.Join(", ", _items.Select(i => i.Name)));
                 ClearSearch();
                 await Settle(200);
+            }
+
+            // 33) 주소 줄 드롭다운 (크롬 주소창처럼)
+            {
+                Navigate(new Location(LocKind.IndexRoot));
+                await Settle(200);
+                BeginAddressEdit();
+                // 경로를 치면 그 위치의 하위 폴더
+                UpdateAddressSuggestions(T + @"\업");
+                await WaitUntil(() => TestAddressSuggestions().Count > 0, 3000);
+                var pathSug = TestAddressSuggestions();
+                Check("주소 줄: 경로를 치면 그 위치의 하위 폴더가 드롭다운에", pathSug.Count == 1 && pathSug[0].Title == "업무", string.Join(", ", pathSug.Select(s => s.Title)));
+                // Tab = 경로 채우기 → 그 아래 폴더가 바로
+                AddressPopupKey(Key.Tab);
+                UpdateAddressSuggestions(AddressBox.Text);
+                await WaitUntil(() => TestAddressSuggestions().Any(s => s.Title == "2024"), 3000);
+                Check("주소 줄: Tab 으로 경로를 채우면 그 아래 폴더", AddressBox.Text == P("업무") + "\\" && TestAddressSuggestions().Select(s => s.Title).Contains("계약"),
+                    $"{AddressBox.Text} → {string.Join(", ", TestAddressSuggestions().Select(s => s.Title))}");
+                // 색인 경로
+                UpdateAddressSuggestions(@"색인\A");
+                await Settle(100);
+                Check("주소 줄: 색인\\… 을 치면 색인 폴더", TestAddressSuggestions().FirstOrDefault()?.Title == "A 프로젝트", string.Join(", ", TestAddressSuggestions().Select(s => s.Sub)));
+                // 이름만 치면 이름이 맞는 색인 폴더 + 원본 폴더
+                UpdateAddressSuggestions("견적");
+                await Settle(100);
+                var nameSug = TestAddressSuggestions();
+                Check("주소 줄: 이름만 치면 맞는 색인 폴더와 원본 폴더", nameSug.Any(s => s.Target.Kind == LocKind.IndexFolder && s.Title == "견적서"),
+                    string.Join(" / ", nameSug.Select(s => $"{s.Title} ({s.Sub})")));
+                UpdateAddressSuggestions("2024");
+                await Settle(100);
+                nameSug = TestAddressSuggestions();
+                Check("주소 줄: 원본 폴더 이름도 (색인할 폴더 안)", nameSug.Any(s => s.Target.Kind == LocKind.Dir && s.Target.Path == P(@"업무\2024")),
+                    string.Join(" / ", nameSug.Select(s => $"{s.Title} ({s.Sub})")));
+                TestShotAddress("33_주소줄_드롭다운");
+                // ↓ + Enter = 그 폴더로
+                AddressPopupKey(Key.Down);
+                var picked = (AddressSuggestion?)_addrList!.SelectedItem;
+                AddressPopupKey(Key.Enter);
+                await Settle(300);
+                Check("주소 줄: ↓ 로 골라 Enter 로 이동, 드롭다운은 닫힘", picked != null && _loc.Same(picked.Target) && _addrPopup?.IsOpen != true && AddressBox.Visibility != Visibility.Visible,
+                    $"{picked?.Sub} → {_loc.Kind} {_loc.Path}");
+                // 고르지 않고 Enter = 예전처럼 친 경로로
+                BeginAddressEdit();
+                AddressBox.Text = P("Downloads");
+                AddressBox_KeyDown(AddressBox, new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(AddressBox)!, 0, Key.Enter) { RoutedEvent = Keyboard.PreviewKeyDownEvent });
+                await Settle(300);
+                Check("주소 줄: 전체 경로 + Enter 는 그 경로로", _loc.Kind == LocKind.Dir && _loc.Path == P("Downloads"), _loc.Path);
             }
 
             // 31) 원본 폴더 자체를 색인 폴더로: 고르기 메뉴 맨 위 = 지금 폴더(또는 고른 폴더), 그다음 최근에 추가한 색인
