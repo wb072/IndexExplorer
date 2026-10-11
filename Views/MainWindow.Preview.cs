@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -107,7 +107,7 @@ public partial class MainWindow
                 Label("원본 위치");
                 Value(item.Path);
                 if (item.Modified != null) { Label("수정한 날짜"); Value(item.ModifiedText); }
-                Buttons(ActionButton("색인에 추가", () => BuildFolderPicker(id => LinkItems(id, [item])).IsOpen = true));
+                Buttons(ActionButton("색인에 추가", () => BuildFolderPicker(id => LinkItems(id, [item]), [item]).IsOpen = true));
                 return;
         }
 
@@ -147,7 +147,7 @@ public partial class MainWindow
         var add = ActionButton("색인에 추가", () => { });
         add.Click += (_, _) =>
         {
-            var m = BuildFolderPicker(id => LinkItems(id, [item]));
+            var m = BuildFolderPicker(id => LinkItems(id, [item]), [item]);
             m.PlacementTarget = add;
             m.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
             m.IsOpen = true;
@@ -169,7 +169,7 @@ public partial class MainWindow
         var add = ActionButton("색인에 추가", () => { }, primary: true);
         add.Click += (_, _) =>
         {
-            var m = BuildFolderPicker(id => LinkItems(id, files));
+            var m = BuildFolderPicker(id => LinkItems(id, files), files);
             m.PlacementTarget = add;
             m.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
             m.IsOpen = true;

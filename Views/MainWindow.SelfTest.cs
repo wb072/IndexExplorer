@@ -936,6 +936,32 @@ public partial class MainWindow
             Check("두 번째 창 색인 표시 공유", w2.TestItemNames().Count == _store.FilesIn(r.Id).Count());
             w2.TestShot("11_두번째창");
             w2.Close();
+
+            // 31) 원본 폴더 자체를 색인 폴더로: 고르기 메뉴 맨 위 = 지금 폴더(또는 고른 폴더), 그다음 최근에 추가한 색인
+            {
+                Navigate(new Location(LocKind.Dir, Path: P("업무")));
+                await Settle(400);
+                List.SelectedItems.Clear();
+                var heads = BuildFolderPicker(_ => { }, []).Items.OfType<MenuItem>().Select(m => m.Header as string ?? "").ToList();
+                Check("원본 → 색인: 고르기 메뉴 맨 위는 지금 폴더, 다음은 최근에 추가한 색인",
+                    heads.Count > 2 && heads[0] == "‘업무’ 폴더를 색인 폴더로" && heads[1] == "최근에 추가한 색인", string.Join(" / ", heads.Take(4)));
+                var dirItem = ItemNamed("2024")!;
+                var dheads = BuildFolderPicker(_ => { }, [dirItem]).Items.OfType<MenuItem>().Select(m => m.Header as string ?? "").ToList();
+                Check("원본 → 색인: 폴더를 고르면 그 폴더가 맨 위", dheads.Take(2).SequenceEqual(["‘2024’ 폴더를 색인 폴더로", "‘업무’ 색인 폴더를 만들어 추가"]), string.Join(" / ", dheads.Take(3)));
+                Shot("31_원본폴더_색인으로");
+                IndexWholeDirs([P("업무")]);
+                await Settle(300);
+                var made = _store.Children(null).FirstOrDefault(f => f.Name == "업무");
+                var sub = made != null ? _store.Children(made.Id).Select(f => f.Name).ToList() : [];
+                var linked = made != null ? _store.FilesIn(made.Id).Count() + _store.Children(made.Id).Sum(c => _store.FilesIn(c.Id).Count()) : 0;
+                Check("원본 → 색인: 폴더 자체가 맨 위 색인 폴더가 되고 하위 구조·파일 연결, 저장 위치는 그 폴더",
+                    made != null && sub.Contains("2024") && sub.Contains("계약") && linked >= 3 && made.StoragePath == P("업무"),
+                    $"하위 {string.Join(",", sub)}, 파일 {linked}개, 저장 {made?.StoragePath}");
+                Check("원본 → 색인: 방금 만든 색인이 최근 목록 맨 앞", _settings.RecentIndexTargets.FirstOrDefault() == made?.Id);
+                IndexWholeDirs([P("업무")]);
+                Check("원본 → 색인: 같은 폴더를 다시 해도 색인 폴더가 하나만", _store.Children(null).Count(f => f.Name.StartsWith("업무")) == 1);
+                HideToast();
+            }
         }
         catch (Exception ex)
         {

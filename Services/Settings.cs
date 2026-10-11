@@ -23,6 +23,9 @@ public sealed class Settings
     /// <summary>파일 종류 보기에서 직접 뺀 폴더 (그 아래 전체가 안 보인다).</summary>
     public List<string> KindExcludes { get; set; } = [];
 
+    /// <summary>최근에 파일을 추가한 색인 폴더 (번호, 최근 순).</summary>
+    public List<long> RecentIndexTargets { get; set; } = [];
+
     /// <summary>파일 종류 (켜기·끄기, 확장자, 사용자가 만든 종류). 순서대로 사이드바에 나온다.</summary>
     public List<KindSetting> Kinds { get; set; } = [];
     public bool IconView { get; set; }

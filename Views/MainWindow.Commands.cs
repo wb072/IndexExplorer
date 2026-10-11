@@ -609,6 +609,7 @@ public partial class MainWindow
                 else if (Directory.Exists(p)) n += LinkDirectory(folderId, p);
             }
         });
+        if (n > 0) RememberIndexTarget(folderId); // 끌어다 놓기·붙여넣기·색인에 추가 모두
         return n;
     }
 
@@ -690,15 +691,74 @@ public partial class MainWindow
     private void AddToIndexMenu_Click(object sender, RoutedEventArgs e)
     {
         var sel = Selected().Where(i => i.Kind is ItemKind.File or ItemKind.Dir).ToList();
-        if (sel.Count == 0) { Toast("색인에 추가할 파일을 먼저 선택하세요"); return; }
-        var menu = BuildFolderPicker(id => LinkItems(id, sel));
+        // 원본 폴더에서 아무것도 고르지 않았으면 "지금 폴더"를 색인으로
+        if (sel.Count == 0 && _loc.Kind != LocKind.Dir) { Toast("색인에 추가할 파일을 먼저 선택하세요"); return; }
+        var menu = BuildFolderPicker(id => LinkItems(id, sel), sel);
         if (sender is FrameworkElement fe and not MainWindow) OpenMenuUnder(menu, fe);
         else menu.IsOpen = true;
     }
 
-    private ContextMenu BuildFolderPicker(Action<long> pick)
+    /// <summary>
+    /// 색인에 추가할 곳 고르기.
+    ///  1) 원본 폴더에서는 맨 위에 "지금 폴더를 색인 폴더로" (고른 것이 폴더뿐이면 "그 폴더를 색인 폴더로"도)
+    ///  2) 최근에 추가한 색인 폴더
+    ///  3) 모든 색인 폴더 (계층) · 새 색인 폴더
+    /// </summary>
+    private ContextMenu BuildFolderPicker(Action<long> pick, IReadOnlyList<ListItem>? items = null)
     {
         var menu = new ContextMenu();
+        var folderIcon = ShellImages.Icon(Settings.DataDir, true);
+        var top = 0;
+        if (items != null && _loc.Kind == LocKind.Dir && Directory.Exists(_loc.Path))
+        {
+            var here = _loc.Path;
+            var hereName = DirLeaf(here);
+            var whole = items.Count == 0;
+            var mi = new MenuItem
+            {
+                Header = whole ? $"‘{hereName}’ 폴더를 색인 폴더로" : $"‘{hereName}’ 색인 폴더를 만들어 추가",
+                FontWeight = FontWeights.SemiBold, Icon = MenuIcon(ShellImages.Icon(here, true, perPath: true)),
+                ToolTip = whole ? $"{here}\n안의 하위 폴더도 같은 구조로 만들고 모든 파일을 연결합니다. 새 파일은 이 폴더에 저장됩니다." : here,
+            };
+            mi.Click += (_, _) =>
+            {
+                if (whole) IndexWholeDirs([here]);
+                else LinkItems(IndexFolderForDir(here).Id, items);
+            };
+            // 고른 것이 폴더뿐이면 그 폴더 자체를 색인 폴더로 (맨 위), 그다음 지금 폴더
+            var dirs = items.Where(i => i.Kind == ItemKind.Dir && !i.Missing).ToList();
+            if (dirs.Count > 0 && dirs.Count == items.Count)
+            {
+                var sd = new MenuItem
+                {
+                    Header = dirs.Count == 1 ? $"‘{dirs[0].Name}’ 폴더를 색인 폴더로" : $"고른 폴더 {dirs.Count}개를 각각 색인 폴더로",
+                    FontWeight = FontWeights.SemiBold, Icon = MenuIcon(ShellImages.Icon(dirs[0].Path, true, perPath: true)),
+                    ToolTip = "안의 하위 폴더도 같은 구조로 만들고 모든 파일을 연결합니다. 새 파일은 그 폴더에 저장됩니다.",
+                };
+                sd.Click += (_, _) => IndexWholeDirs(dirs.Select(d => d.Path).ToList());
+                menu.Items.Add(sd);
+                mi.FontWeight = FontWeights.Normal;
+                top++;
+            }
+            menu.Items.Add(mi);
+            top++;
+        }
+        // 최근에 추가한 색인 폴더
+        var recent = _settings.RecentIndexTargets.Where(id => _store.Folder(id) != null).Take(5).ToList();
+        if (recent.Count > 0)
+        {
+            if (top > 0) menu.Items.Add(new Separator());
+            menu.Items.Add(new MenuItem { Header = "최근에 추가한 색인", IsEnabled = false, FontSize = 11.5 });
+            foreach (var id in recent)
+            {
+                var fid = id;
+                var mi = new MenuItem { Header = _store.ChainText(fid), Icon = MenuIcon(folderIcon) };
+                mi.Click += (_, _) => pick(fid);
+                menu.Items.Add(mi);
+            }
+            top++;
+        }
+        if (top > 0) menu.Items.Add(new Separator());
         var roots = _store.Children(null).ToList();
         if (roots.Count == 0)
         {
@@ -735,6 +795,62 @@ public partial class MainWindow
         mi.Items.Add(new Separator());
         foreach (var k in kids) mi.Items.Add(FolderMenuItem(k, pick));
         return mi;
+    }
+
+    private static string DirLeaf(string dir)
+    {
+        var name = Path.GetFileName(Path.TrimEndingDirectorySeparator(dir));
+        return string.IsNullOrEmpty(name) ? dir.TrimEnd('\\', ':') : name;
+    }
+
+    /// <summary>원본 폴더와 같은 이름의 맨 위 색인 폴더 (없으면 만든다). 저장 위치는 그 원본 폴더 (새 파일이 그 폴더에 생긴다).</summary>
+    private IndexFolder IndexFolderForDir(string dir)
+    {
+        dir = Path.TrimEndingDirectorySeparator(dir);
+        var name = DirLeaf(dir);
+        var f = _store.Children(null).FirstOrDefault(x => x.Name.Equals(name, StringComparison.OrdinalIgnoreCase)
+                    && (string.IsNullOrEmpty(x.StoragePath) || Path.TrimEndingDirectorySeparator(x.StoragePath).Equals(dir, StringComparison.OrdinalIgnoreCase)))
+                ?? _store.CreateFolder(null, name);
+        if (string.IsNullOrEmpty(f.StoragePath)) _store.SetStoragePath(f.Id, dir);
+        return f;
+    }
+
+    /// <summary>원본 폴더 자체를 맨 위 색인 폴더로: 하위 폴더는 같은 구조로, 안의 파일은 모두 연결.</summary>
+    private void IndexWholeDirs(IReadOnlyList<string> dirs)
+    {
+        var n = 0;
+        IndexFolder? last = null;
+        var opts = new EnumerationOptions { IgnoreInaccessible = true, AttributesToSkip = FileAttributes.Hidden | FileAttributes.System };
+        _store.Batch(() =>
+        {
+            foreach (var dir in dirs)
+            {
+                var f = last = IndexFolderForDir(dir);
+                try
+                {
+                    foreach (var file in Directory.EnumerateFiles(dir, "*", opts))
+                        if ((_store.ByPath(file) ?? _store.UpsertFromDisk(file)) is { } rec) { _store.Link(f.Id, rec); n++; }
+                    foreach (var d in Directory.EnumerateDirectories(dir, "*", opts)) n += LinkDirectory(f.Id, d);
+                }
+                catch (Exception ex) { App.Log("index dir: " + ex.Message); }
+                RememberIndexTarget(f.Id);
+            }
+        });
+        RefreshNow();
+        if (last == null) return;
+        var target = last.Id;
+        Toast(dirs.Count == 1 ? $"‘{last.Name}’ 폴더를 색인 폴더로 만들었습니다" : $"폴더 {dirs.Count}개를 색인 폴더로 만들었습니다",
+            $"파일 {n:N0}개를 연결했습니다. 하위 폴더도 같은 구조로 만들었고, 원본 파일은 그대로 있습니다.",
+            "열기", () => Navigate(new Location(LocKind.IndexFolder, target)));
+    }
+
+    /// <summary>최근에 추가한 색인 폴더 (고르기 메뉴 위쪽에 보인다).</summary>
+    private void RememberIndexTarget(long folderId)
+    {
+        var list = _settings.RecentIndexTargets;
+        list.Remove(folderId);
+        list.Insert(0, folderId);
+        if (list.Count > 8) list.RemoveRange(8, list.Count - 8);
     }
 
     private void LinkItems(long folderId, IReadOnlyList<ListItem> items)
@@ -815,7 +931,7 @@ public partial class MainWindow
         if (sel.Count == 1 && sel[0].Kind == ItemKind.File && !_loc.IsPhysical)
             extras.Add(new("원본 위치 열기", () => RevealOriginal(sel[0])));
         if (files.Count > 0)
-            extras.Add(new("색인에 추가…", () => BuildFolderPicker(id => LinkItems(id, files)).IsOpen = true));
+            extras.Add(new("색인에 추가…", () => BuildFolderPicker(id => LinkItems(id, files), files).IsOpen = true));
         if (sel.Any(i => i.Kind == ItemKind.File))
             extras.Add(new("메모장으로 열기", () => OpenInNotepad(sel)));
         if (_loc.Kind == LocKind.FileKind && files.Count > 0)
@@ -1013,7 +1129,7 @@ public partial class MainWindow
         CutBtn.IsEnabled = CopyBtn.IsEnabled = sel.Any(i => i.Kind is ItemKind.File or ItemKind.Dir or ItemKind.IndexFolder);
         RenameBtn.IsEnabled = sel.Count == 1 && sel[0].Kind != ItemKind.Drive && !sel[0].Missing;
         DeleteBtn.IsEnabled = sel.Count > 0 && sel.All(i => i.Kind != ItemKind.Drive);
-        AddIndexBtn.IsEnabled = sel.Any(i => i.Kind is ItemKind.File or ItemKind.Dir);
+        AddIndexBtn.IsEnabled = sel.Any(i => i.Kind is ItemKind.File or ItemKind.Dir) || _loc.Kind == LocKind.Dir; // 고른 것이 없으면 지금 폴더
         PasteBtn.IsEnabled = _loc.Kind is LocKind.IndexRoot or LocKind.IndexFolder or LocKind.Dir;
         NewBtn.IsEnabled = _loc.Kind is LocKind.IndexRoot or LocKind.IndexFolder or LocKind.Dir;
         DeleteBtn.ToolTip = _loc.Kind == LocKind.IndexFolder
