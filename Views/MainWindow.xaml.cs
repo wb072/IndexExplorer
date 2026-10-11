@@ -945,7 +945,7 @@ public partial class MainWindow : Window
     private void UpdateSortHeaders()
     {
         foreach (var (col, (key, title)) in _colInfo)
-            col.Header = new HeaderInfo(title, key == _sortKey ? (_sortDesc ? 2 : 1) : 0, _filters.ContainsKey(key));
+            col.Header = new HeaderInfo(title, key == _sortKey ? (_sortDesc ? 2 : 1) : 0, _filters.ContainsKey(key) || (key == "Name" && _filters.ContainsKey(NameTextKey)));
     }
 
     private void Header_Click(object sender, RoutedEventArgs e)

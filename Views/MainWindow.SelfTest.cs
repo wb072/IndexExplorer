@@ -893,8 +893,23 @@ public partial class MainWindow
                 var filterMs = swB.ElapsedMilliseconds;
                 var shownRows = TestFilterRowsMade();
                 TestShotFilter("29_필터_원본위치_8천곳");
+                var boxH = TestFilterSearchHeight();
                 TestCloseFilter();
                 Check("대량: 원본 위치 8천 곳 — 열 필터 열기", filterMs < 1000, $"{filterMs}ms, 만든 줄 {shownRows}개");
+                Check("열 필터: 찾기 칸 높이는 낮게", boxH is > 0 and <= 30, $"{boxH:0}px");
+                // 이름 열 필터에도 찾기 칸: 글자로 목록을 바로 거른다
+                var nameCol = _colInfo.First(kv => kv.Value.key == "Name").Key;
+                OpenFilterMenu(nameCol, List);
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                swB.Restart();
+                TestFilterType("4999");
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                var nameHits = _view.Count;
+                TestShotFilter("30_필터_이름_찾기");
+                TestCloseFilter();
+                Check("열 필터: 이름 찾기 칸으로 바로 거르기 (5만 개 중)", nameHits == 15 && StatusLeft.Text.Contains("필터"), $"{nameHits}개, {swB.ElapsedMilliseconds}ms, {StatusLeft.Text}");
+                _filters.Clear();
+                ApplyFilter();
                 swB.Restart();
                 SetSort("Location");
                 await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);

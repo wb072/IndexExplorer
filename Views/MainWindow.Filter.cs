@@ -16,6 +16,8 @@ namespace IndexExplorer.Views;
 public partial class MainWindow
 {
     private readonly Dictionary<string, HashSet<string>> _filters = [];
+    /// <summary>이름 열 필터의 찾기 칸 글자 (_filters 에 같이 두어 탭 저장·상태 표시·지우기를 그대로 쓴다).</summary>
+    private const string NameTextKey = "NameText";
 
     private static readonly string[] NameOrder = ["0–9", "ㄱ–ㄹ", "ㅁ–ㅅ", "ㅇ–ㅊ", "ㅋ–ㅎ", "A–H", "I–P", "Q–Z", "기타"];
     private static readonly string[] DateOrder = ["오늘", "어제", "이번 주", "지난주", "이번 달", "지난달", "올해", "작년 이전", "날짜 없음"];
@@ -84,6 +86,8 @@ public partial class MainWindow
         var i = (ListItem)o;
         foreach (var (key, set) in _filters)
         {
+            // 이름 필터의 찾기 칸: 이름에 그 글자가 들어 있는 것만 (폴더도)
+            if (key == NameTextKey) { if (!i.Name.Contains(set.First(), StringComparison.CurrentCultureIgnoreCase)) return false; continue; }
             if (i.IsFolderLike && key != "Name") continue;
             if (!Buckets(i, key).Any(set.Contains)) return false;
         }
@@ -187,32 +191,47 @@ public partial class MainWindow
         };
 
         var panel = new StackPanel { Width = 340 };
-        if (rows.Count > 12)
+        var isName = key == "Name";
+        if (isName || rows.Count > 12)
         {
-            var search = new TextBox { Style = (Style)FindResource("FormBox"), Margin = new Thickness(8, 8, 8, 4) };
+            // 이름: 글자로 목록을 바로 거른다 / 값이 많은 열(원본 위치 등): 이 창의 값 목록을 거른다
+            var text = isName && _filters.TryGetValue(NameTextKey, out var nt) ? nt.First() : "";
+            var search = new TextBox
+            {
+                Style = (Style)FindResource("FormBox"), Margin = new Thickness(8, 6, 8, 4), Padding = new Thickness(4, 0, 4, 0),
+                MinHeight = 0, Height = 26, VerticalContentAlignment = VerticalAlignment.Center,
+                FontSize = 12.5, Text = text,
+            };
             var hint = new TextBlock
             {
-                Text = $"{rows.Count:N0}개 중 찾기", Foreground = (Brush)FindResource("MutedBrush"), IsHitTestVisible = false,
-                Margin = new Thickness(20, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center,
+                Text = isName ? "이름에 들어간 글자로 찾기" : $"{rows.Count:N0}개 중 찾기", FontSize = 12.5,
+                Foreground = (Brush)FindResource("MutedBrush"), IsHitTestVisible = false,
+                Margin = new Thickness(19, 2, 0, 0), VerticalAlignment = VerticalAlignment.Center,
+                Visibility = text.Length == 0 ? Visibility.Visible : Visibility.Collapsed,
             };
             search.TextChanged += (_, _) =>
             {
                 var q = search.Text.Trim();
-                hint.Visibility = q.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
-                view.Filter = q.Length == 0 ? null : o => ((FilterRow)o).Bucket.Contains(q, StringComparison.CurrentCultureIgnoreCase);
+                hint.Visibility = search.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+                if (isName)
+                {
+                    if (q.Length == 0) _filters.Remove(NameTextKey); else _filters[NameTextKey] = [q];
+                    ApplyFilter();
+                }
+                else view.Filter = q.Length == 0 ? null : o => ((FilterRow)o).Bucket.Contains(q, StringComparison.CurrentCultureIgnoreCase);
             };
+            search.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) _filterPopup!.IsOpen = false; };
             var g = new Grid();
             g.Children.Add(search);
             g.Children.Add(hint);
-            hint.Margin = new Thickness(23, 4, 0, 0);
             panel.Children.Add(g);
-            panel.Loaded += (_, _) => search.Focus();
+            panel.Loaded += (_, _) => { search.Focus(); search.CaretIndex = search.Text.Length; };
         }
-        if (current != null)
+        if (current != null || (isName && _filters.ContainsKey(NameTextKey)))
         {
-            var clear = new Button { Style = (Style)FindResource("ToolButtonB"), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left, Height = 30, Margin = new Thickness(4, 4, 4, 0) };
+            var clear = new Button { Style = (Style)FindResource("ToolButtonB"), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left, Height = 28, Margin = new Thickness(4, 2, 4, 0) };
             clear.Content = new TextBlock { Text = "필터 지우기", Foreground = (Brush)FindResource("AccentBrush") };
-            clear.Click += (_, _) => { _filters.Remove(key); ApplyFilter(); _filterPopup!.IsOpen = false; };
+            clear.Click += (_, _) => { _filters.Remove(key); if (isName) _filters.Remove(NameTextKey); ApplyFilter(); _filterPopup!.IsOpen = false; };
             panel.Children.Add(clear);
         }
         if (rows.Count == 0) panel.Children.Add(new TextBlock { Text = "항목 없음", Foreground = (Brush)FindResource("MutedBrush"), Margin = new Thickness(14, 10, 14, 10) });
@@ -236,6 +255,10 @@ public partial class MainWindow
     internal int TestFilterRowsMade() =>
         _filterPopup?.Child is { } c ? CountDescendants<ListBoxItem>(c) : 0;
     internal void TestCloseFilter() { if (_filterPopup != null) _filterPopup.IsOpen = false; }
+
+    private TextBox? FilterSearchBox() => _filterPopup?.Child is { } c ? FindDescendant<TextBox>(c) : null;
+    internal double TestFilterSearchHeight() => FilterSearchBox()?.ActualHeight ?? 0;
+    internal void TestFilterType(string text) { if (FilterSearchBox() is { } b) b.Text = text; }
 
     internal void TestShotFilter(string name)
     {

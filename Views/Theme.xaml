@@ -520,7 +520,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
                     <Border x:Name="Bd" Background="White" BorderBrush="{StaticResource FieldBorderBrush}" BorderThickness="1" CornerRadius="8">
-                        <ScrollViewer x:Name="PART_ContentHost" Focusable="False" Margin="{TemplateBinding Padding}"
+                        <ScrollViewer x:Name="PART_ContentHost" Focusable="False" Margin="{TemplateBinding Padding}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                       HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" />
                     </Border>
                     <ControlTemplate.Triggers>
